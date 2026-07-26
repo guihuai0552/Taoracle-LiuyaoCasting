@@ -1,0 +1,15 @@
+{
+  "name": "liuyao-archive",
+  "private": true,
+  "workspaces": [
+    "services/*"
+  ],
+  "scripts": {
+    "dev:engine": "cd services/liuyao-engine && python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8790 --reload",
+    "dev:agent": "npm --workspace @liuyao/agent run dev",
+    "build:agent": "npm --workspace @liuyao/agent run build",
+    "check:agent": "npm --workspace @liuyao/agent run check",
+    "test:agent": "npm --workspace @liuyao/agent run test",
+    "test:engine": "cd services/liuyao-engine && PYTHONPATH=. python3 -m unittest discover -s tests -v"
+  }
+}

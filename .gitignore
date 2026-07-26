@@ -1,0 +1,11 @@
+.DS_Store
+.artifacts/
+.idea/
+.vscode/
+.env
+services/agent/.data/
+services/agent/dist/
+services/liuyao-engine/.venv/
+__pycache__/
+*.py[cod]
+node_modules/
