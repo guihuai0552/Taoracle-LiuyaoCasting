@@ -1,0 +1,11 @@
+name: liuyao_engine
+description: 完全离线、可审计的六爻纳甲排盘与中国万年历纯 Dart 引擎。
+version: 0.16.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

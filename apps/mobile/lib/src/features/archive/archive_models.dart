@@ -1,3 +1,5 @@
+import '../casting/casting_models.dart';
+
 class CaseSummary {
   const CaseSummary({
     required this.id,
@@ -8,17 +10,48 @@ class CaseSummary {
     required this.baseHexagram,
     required this.changedHexagram,
     required this.latestAnalysisRevision,
+    required this.createdAt,
+    required this.updatedAt,
+    this.questionContext = '',
+    this.questionContextUpdatedAt,
+    this.calendarPolicy = const <String, dynamic>{},
+    this.fourPillarsContext = const <String, dynamic>{},
+    this.displayContext = const <String, dynamic>{},
+    this.castingContext = const <String, dynamic>{},
+    this.tags = const [],
   });
 
   factory CaseSummary.fromJson(Map<String, dynamic> json) => CaseSummary(
     id: json['id'] as String,
     title: json['title'] as String,
     question: json['question'] as String,
-    castAt: DateTime.parse(json['castAt'] as String),
+    castAt: _parseWallClock(json['castAt'] as String),
     castingMethod: json['castingMethod'] as String,
     baseHexagram: json['baseHexagram'] as String,
     changedHexagram: json['changedHexagram'] as String?,
     latestAnalysisRevision: json['latestAnalysisRevision'] as int? ?? 0,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    updatedAt: DateTime.parse(json['updatedAt'] as String),
+    questionContext:
+        json['questionContext'] as String? ??
+        json['question_context'] as String? ??
+        '',
+    questionContextUpdatedAt: _parseOptionalDate(
+      json['questionContextUpdatedAt'] ?? json['question_context_updated_at'],
+    ),
+    calendarPolicy: _mapOrEmpty(
+      json['calendarPolicy'] ?? json['calendar_policy'],
+    ),
+    fourPillarsContext: _mapOrEmpty(
+      json['fourPillarsContext'] ?? json['four_pillars_context'],
+    ),
+    displayContext: _mapOrEmpty(
+      json['displayContext'] ?? json['display_context'],
+    ),
+    castingContext: _mapOrEmpty(
+      json['castingContext'] ?? json['casting_context'],
+    ),
+    tags: _stringList(json['tags']),
   );
 
   final String id;
@@ -29,6 +62,15 @@ class CaseSummary {
   final String baseHexagram;
   final String? changedHexagram;
   final int latestAnalysisRevision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String questionContext;
+  final DateTime? questionContextUpdatedAt;
+  final Map<String, dynamic> calendarPolicy;
+  final Map<String, dynamic> fourPillarsContext;
+  final Map<String, dynamic> displayContext;
+  final Map<String, dynamic> castingContext;
+  final List<String> tags;
 }
 
 class CaseAnalysis {
@@ -55,139 +97,37 @@ class CaseAnalysis {
   final DateTime createdAt;
 }
 
-class ChartLine {
-  const ChartLine({
-    required this.position,
-    required this.yinYang,
-    required this.relation,
-    required this.branch,
-    required this.element,
-    this.value,
-    this.changing = false,
-    this.sixGod,
-    this.role,
-    this.hidden,
+class CaseFeedback {
+  const CaseFeedback({
+    required this.id,
+    required this.body,
+    required this.status,
+    required this.occurredAt,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
-  factory ChartLine.fromJson(Map<String, dynamic> json) => ChartLine(
-    position: json['position'] as int,
-    value: json['value'] as int?,
-    yinYang: json['yin_yang'] as String,
-    changing: json['changing'] as bool? ?? false,
-    sixGod: json['six_god'] as String?,
-    relation: json['relation'] as String,
-    branch: json['branch'] as String,
-    element: json['element'] as String,
-    role: json['role'] as String?,
-    hidden: json['hidden'] is Map<String, dynamic>
-        ? ChartHidden.fromJson(json['hidden'] as Map<String, dynamic>)
-        : null,
+  factory CaseFeedback.fromJson(Map<String, dynamic> json) => CaseFeedback(
+    id: json['id'] as String,
+    body: json['body'] as String,
+    status: json['status'] as String,
+    occurredAt: json['occurredAt'] == null
+        ? null
+        : DateTime.parse(json['occurredAt'] as String),
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    updatedAt: DateTime.parse(json['updatedAt'] as String),
   );
 
-  final int position;
-  final int? value;
-  final String yinYang;
-  final bool changing;
-  final String? sixGod;
-  final String relation;
-  final String branch;
-  final String element;
-  final String? role;
-  final ChartHidden? hidden;
-}
-
-class ChartHidden {
-  const ChartHidden({
-    required this.relation,
-    required this.branch,
-    required this.element,
-  });
-
-  factory ChartHidden.fromJson(Map<String, dynamic> json) => ChartHidden(
-    relation: json['relation'] as String,
-    branch: json['branch'] as String,
-    element: json['element'] as String,
-  );
-
-  final String relation;
-  final String branch;
-  final String element;
-}
-
-class ChartHexagram {
-  const ChartHexagram({
-    required this.name,
-    required this.palaceName,
-    required this.palaceElement,
-    required this.lines,
-  });
-
-  factory ChartHexagram.fromJson(Map<String, dynamic> json) => ChartHexagram(
-    name: json['name'] as String,
-    palaceName: json['palace_name'] as String,
-    palaceElement: json['palace_element'] as String? ?? '',
-    lines: (json['lines'] as List<dynamic>)
-        .map((item) => ChartLine.fromJson(item as Map<String, dynamic>))
-        .toList(growable: false),
-  );
-
-  final String name;
-  final String palaceName;
-  final String palaceElement;
-  final List<ChartLine> lines;
-}
-
-class ChartSnapshot {
-  const ChartSnapshot({
-    required this.schemaVersion,
-    required this.engineVersion,
-    required this.castAt,
-    required this.lineValues,
-    required this.year,
-    required this.month,
-    required this.day,
-    required this.hour,
-    required this.dayVoid,
-    required this.base,
-    required this.changed,
-  });
-
-  factory ChartSnapshot.fromJson(Map<String, dynamic> json) {
-    final meta = json['meta'] as Map<String, dynamic>;
-    final time = json['time'] as Map<String, dynamic>;
-    final hexagram = json['hexagram'] as Map<String, dynamic>;
-    return ChartSnapshot(
-      schemaVersion: json['schema_version'] as int,
-      engineVersion: json['engine_version'] as String,
-      castAt: DateTime.parse(meta['cast_at'] as String),
-      lineValues: (meta['line_values'] as List<dynamic>).cast<int>(),
-      year: time['year'] as String,
-      month: time['month'] as String,
-      day: time['day'] as String,
-      hour: time['hour'] as String,
-      dayVoid: time['day_void'] as String,
-      base: ChartHexagram.fromJson(hexagram['base'] as Map<String, dynamic>),
-      changed: hexagram['changed'] is Map<String, dynamic>
-          ? ChartHexagram.fromJson(hexagram['changed'] as Map<String, dynamic>)
-          : null,
-    );
-  }
-
-  final int schemaVersion;
-  final String engineVersion;
-  final DateTime castAt;
-  final List<int> lineValues;
-  final String year;
-  final String month;
-  final String day;
-  final String hour;
-  final String dayVoid;
-  final ChartHexagram base;
-  final ChartHexagram? changed;
+  final String id;
+  final String body;
+  final String status;
+  final DateTime? occurredAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 }
 
 class CaseDetail extends CaseSummary {
-  const CaseDetail({
+  CaseDetail({
     required super.id,
     required super.title,
     required super.question,
@@ -196,25 +136,153 @@ class CaseDetail extends CaseSummary {
     required super.baseHexagram,
     required super.changedHexagram,
     required super.latestAnalysisRevision,
+    required super.createdAt,
+    required super.updatedAt,
+    super.questionContext,
+    super.questionContextUpdatedAt,
+    super.calendarPolicy,
+    super.fourPillarsContext,
+    super.displayContext,
+    super.castingContext,
+    super.tags,
     required this.chart,
+    required this.chartJson,
     required this.analyses,
+    required this.feedbacks,
   });
 
-  factory CaseDetail.fromJson(Map<String, dynamic> json) => CaseDetail(
-    id: json['id'] as String,
-    title: json['title'] as String,
-    question: json['question'] as String,
-    castAt: DateTime.parse(json['castAt'] as String),
-    castingMethod: json['castingMethod'] as String,
-    baseHexagram: json['baseHexagram'] as String,
-    changedHexagram: json['changedHexagram'] as String?,
-    latestAnalysisRevision: json['latestAnalysisRevision'] as int? ?? 0,
-    chart: ChartSnapshot.fromJson(json['chart'] as Map<String, dynamic>),
-    analyses: (json['analyses'] as List<dynamic>)
-        .map((item) => CaseAnalysis.fromJson(item as Map<String, dynamic>))
-        .toList(growable: false),
-  );
+  factory CaseDetail.fromJson(Map<String, dynamic> json) {
+    final chartJson = json['chart'] as Map<String, dynamic>;
+    return CaseDetail(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      question: json['question'] as String,
+      castAt: _parseWallClock(json['castAt'] as String),
+      castingMethod: json['castingMethod'] as String,
+      baseHexagram: json['baseHexagram'] as String,
+      changedHexagram: json['changedHexagram'] as String?,
+      latestAnalysisRevision: json['latestAnalysisRevision'] as int? ?? 0,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      questionContext:
+          json['questionContext'] as String? ??
+          json['question_context'] as String? ??
+          '',
+      questionContextUpdatedAt: _parseOptionalDate(
+        json['questionContextUpdatedAt'] ?? json['question_context_updated_at'],
+      ),
+      calendarPolicy: _mapOrEmpty(
+        json['calendarPolicy'] ?? json['calendar_policy'],
+      ),
+      fourPillarsContext: _mapOrEmpty(
+        json['fourPillarsContext'] ?? json['four_pillars_context'],
+      ),
+      displayContext: _mapOrEmpty(
+        json['displayContext'] ?? json['display_context'],
+      ),
+      castingContext: _mapOrEmpty(
+        json['castingContext'] ?? json['casting_context'],
+      ),
+      tags: _stringList(json['tags']),
+      chart: CastPreview.fromJson(chartJson),
+      chartJson: Map<String, dynamic>.unmodifiable(chartJson),
+      analyses: (json['analyses'] as List<dynamic>)
+          .map((item) => CaseAnalysis.fromJson(item as Map<String, dynamic>))
+          .toList(growable: false),
+      feedbacks: (json['feedbacks'] as List<dynamic>? ?? const [])
+          .map((item) => CaseFeedback.fromJson(item as Map<String, dynamic>))
+          .toList(growable: false),
+    );
+  }
 
-  final ChartSnapshot chart;
+  final CastPreview chart;
+  final Map<String, dynamic> chartJson;
   final List<CaseAnalysis> analyses;
+  final List<CaseFeedback> feedbacks;
+}
+
+class CaseExportFile {
+  const CaseExportFile({
+    required this.filename,
+    required this.contentType,
+    required this.content,
+  });
+
+  final String filename;
+  final String contentType;
+  final String content;
+}
+
+enum ArchiveImportMode { merge, replaceAll }
+
+class ArchiveImportPreview {
+  const ArchiveImportPreview({
+    required this.totalCases,
+    required this.newCases,
+    required this.identicalCases,
+    required this.conflictingCases,
+    required this.analysisCount,
+    required this.feedbackCount,
+    required this.sourceLabel,
+  });
+
+  final int totalCases;
+  final int newCases;
+  final int identicalCases;
+  final int conflictingCases;
+  final int analysisCount;
+  final int feedbackCount;
+  final String sourceLabel;
+}
+
+class ArchiveImportResult {
+  const ArchiveImportResult({
+    required this.importedCases,
+    required this.skippedCases,
+    required this.copiedConflicts,
+    required this.replacedExistingCases,
+  });
+
+  final int importedCases;
+  final int skippedCases;
+  final int copiedConflicts;
+  final int replacedExistingCases;
+}
+
+DateTime? _parseOptionalDate(Object? value) {
+  if (value is! String || value.isEmpty) return null;
+  return DateTime.tryParse(value);
+}
+
+/// 解析标签列表：去空白、去重、忽略空项；缺失按空数组处理。
+List<String> _stringList(Object? value) {
+  if (value is! List) return const [];
+  final seen = <String>{};
+  for (final item in value) {
+    if (item is! String) continue;
+    final trimmed = item.trim();
+    if (trimmed.isEmpty) continue;
+    seen.add(trimmed);
+  }
+  return List.unmodifiable(seen);
+}
+
+Map<String, dynamic> _mapOrEmpty(Object? value) {
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return const <String, dynamic>{};
+}
+
+DateTime _parseWallClock(String value) {
+  final match = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?',
+  ).firstMatch(value);
+  if (match == null) return DateTime.parse(value);
+  return DateTime(
+    int.parse(match.group(1)!),
+    int.parse(match.group(2)!),
+    int.parse(match.group(3)!),
+    int.parse(match.group(4)!),
+    int.parse(match.group(5)!),
+    int.parse(match.group(6) ?? '0'),
+  );
 }

@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="2820" viewBox="0 0 1400 2820">
+  <defs>
+    <pattern id="riceGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#332e29" stroke-opacity=".055" stroke-width="1"/>
+      <circle cx="2" cy="3" r=".7" fill="#332e29" opacity=".06"/>
+    </pattern>
+    <pattern id="lattice" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M0 0H32V32H0ZM8 8H24V24H8ZM0 16H8M24 16H32M16 0V8M16 24V32" fill="none" stroke="#171512" stroke-opacity=".16" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#665f57"/>
+    </marker>
+    <style>
+      .board{fill:#e9e4da}.paper{fill:#fbf8f0}.phone{fill:#fbf8f0;stroke:#171512;stroke-width:2}.parch{fill:#f3ebdd;stroke:#665f57;stroke-width:1}.scroll{fill:#e5d2ad;stroke:#665f57;stroke-width:1}.ink{fill:#171512}.muted{fill:#665f57}.red{fill:#9f3027}.jade{fill:#3f6250}.line{stroke:#332e29;stroke-width:1}.faint{stroke:#b8ada0;stroke-width:1}.dash{stroke:#b8ada0;stroke-width:1;stroke-dasharray:2 3}.title{font:700 28px 'Songti SC','Noto Serif CJK SC',serif;fill:#171512}.h1{font:700 20px 'Songti SC','Noto Serif CJK SC',serif;fill:#171512}.h2{font:700 15px 'Songti SC','Noto Serif CJK SC',serif;fill:#171512}.body{font:500 12px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#332e29}.small{font:500 9px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#665f57}.tiny{font:500 7px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#665f57}.label{font:700 10px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#332e29}.data{font:700 12px 'Songti SC','Noto Serif CJK SC',serif;fill:#171512}.data2{font:500 8px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#665f57}.frameLabel{font:700 18px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#171512}.note{font:500 11px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#665f57}.nav{font:600 9px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#665f57}.navOn{fill:#9f3027;font-weight:700}.button{fill:#171512}.buttonText{font:700 12px 'PingFang SC','Noto Sans CJK SC',sans-serif;fill:#fbf8f0}.outlineButton{fill:none;stroke:#171512;stroke-width:1.2}.seal{fill:none;stroke:#9f3027;stroke-width:1.5}.sealText{font:700 16px 'Songti SC','Noto Serif CJK SC',serif;fill:#9f3027}.flow{fill:none;stroke:#665f57;stroke-width:1.5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <rect class="board" width="1400" height="2820"/>
+  <rect width="1400" height="2820" fill="url(#riceGrid)"/>
+
+  <text x="60" y="62" class="title">六爻排盘与存档 · 移动端总线框 v0.1</text>
+  <text x="60" y="92" class="note">中式窗棂网格 × 黑白水墨 × 宣纸留白 × 羊皮纸卷｜本轮只审阅流程、层级与信息排列</text>
+  <rect x="60" y="118" width="1280" height="82" rx="8" class="paper" stroke="#b8ada0"/>
+  <rect x="78" y="136" width="102" height="46" rx="4" class="parch"/><text x="129" y="164" text-anchor="middle" class="label">01A 万年历</text>
+  <path d="M180 159H250" class="flow"/><rect x="250" y="136" width="120" height="46" rx="4" class="parch"/><text x="310" y="164" text-anchor="middle" class="label">02A/02B 起卦</text>
+  <path d="M370 159H440" class="flow"/><rect x="440" y="136" width="110" height="46" rx="4" class="parch"/><text x="495" y="164" text-anchor="middle" class="label">自动存档</text>
+  <path d="M550 159H620" class="flow"/><rect x="620" y="136" width="110" height="46" rx="4" class="scroll"/><text x="675" y="164" text-anchor="middle" class="label">04A 卦面</text>
+  <path d="M730 159H800" class="flow"/><rect x="800" y="136" width="120" height="46" rx="4" class="parch"/><text x="860" y="164" text-anchor="middle" class="label">05A 解读反馈</text>
+  <path d="M920 159H990" class="flow"/><rect x="990" y="136" width="110" height="46" rx="4" class="parch"/><text x="1045" y="164" text-anchor="middle" class="label">06A 导出</text>
+  <rect x="1142" y="136" width="176" height="46" rx="4" fill="url(#lattice)" stroke="#b8ada0"/><text x="1230" y="164" text-anchor="middle" class="label">03A 档案可直接进入卦面</text>
+
+  <!-- 01A -->
+  <g transform="translate(60 250)">
+    <text x="0" y="-18" class="frameLabel">01A 万年历</text><text x="118" y="-18" class="note">一级页 / 默认入口</text>
+    <rect width="360" height="760" rx="24" class="phone"/>
+    <rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <text x="20" y="34" class="small">万年历</text><text x="20" y="68" class="h1">2026年08月</text>
+    <rect x="250" y="34" width="28" height="28" rx="4" class="outlineButton"/><text x="264" y="53" text-anchor="middle" class="body">‹</text>
+    <rect x="286" y="34" width="28" height="28" rx="4" class="outlineButton"/><text x="300" y="53" text-anchor="middle" class="small">今</text>
+    <rect x="322" y="34" width="28" height="28" rx="4" class="outlineButton"/><text x="336" y="53" text-anchor="middle" class="body">›</text>
+    <rect x="12" y="86" width="336" height="348" rx="8" class="paper" stroke="#b8ada0"/>
+    <g class="small" text-anchor="middle"><text x="36" y="110">一</text><text x="84" y="110">二</text><text x="132" y="110">三</text><text x="180" y="110">四</text><text x="228" y="110">五</text><text x="276" y="110">六</text><text x="324" y="110">日</text></g>
+    <g class="body" text-anchor="middle"><text x="36" y="146">3</text><text x="84" y="146">4</text><text x="132" y="146">5</text><rect x="157" y="122" width="46" height="54" rx="6" fill="#9f3027"/><text x="180" y="146" fill="#fbf8f0">6</text><text x="228" y="146">7</text><text x="276" y="146">8</text><text x="324" y="146">9</text></g>
+    <g class="tiny" text-anchor="middle"><text x="36" y="162">廿一</text><text x="84" y="162">廿二</text><text x="132" y="162">廿三</text><text x="180" y="162" fill="#fbf8f0">廿四</text><text x="228" y="162" fill="#9f3027">立秋</text><text x="276" y="162">廿六</text><text x="324" y="162">廿七</text></g>
+    <g class="body" text-anchor="middle"><text x="36" y="212">10</text><text x="84" y="212">11</text><text x="132" y="212">12</text><text x="180" y="212">13</text><text x="228" y="212">14</text><text x="276" y="212">15</text><text x="324" y="212">16</text><text x="36" y="278">17</text><text x="84" y="278">18</text><text x="132" y="278">19</text><text x="180" y="278">20</text><text x="228" y="278">21</text><text x="276" y="278">22</text><text x="324" y="278">23</text><text x="36" y="344">24</text><text x="84" y="344">25</text><text x="132" y="344">26</text><text x="180" y="344">27</text><text x="228" y="344">28</text><text x="276" y="344">29</text><text x="324" y="344">30</text><text x="36" y="410">31</text></g>
+    <path d="M20 460H340M26 454V592M334 454V592" class="line"/><rect x="20" y="454" width="320" height="144" class="scroll"/>
+    <text x="36" y="484" class="h1">六月廿四</text><text x="36" y="505" class="small">丙午年 · 乙未月 · 壬子日 · 辛亥时</text>
+    <line x1="36" y1="520" x2="324" y2="520" class="faint"/><text x="36" y="544" class="label">四柱与纳音</text>
+    <g class="small" text-anchor="middle"><text x="74" y="566">丙午</text><text x="144" y="566">乙未</text><text x="214" y="566">壬子</text><text x="284" y="566">辛亥</text><text x="74" y="584">天河水</text><text x="144" y="584">砂中金</text><text x="214" y="584">桑柘木</text><text x="284" y="584">钗钏金</text></g>
+    <rect x="20" y="614" width="320" height="44" rx="5" class="button"/><text x="180" y="641" text-anchor="middle" class="buttonText">以此时间起卦</text>
+    <line x1="0" y1="686" x2="360" y2="686" class="faint"/>
+    <g text-anchor="middle" class="nav"><text x="45" y="720" class="navOn">▦</text><text x="45" y="739" class="navOn">万年历</text><text x="135" y="720">䷀</text><text x="135" y="739">六爻</text><text x="225" y="720">▣</text><text x="225" y="739">档案</text><text x="315" y="720">☰</text><text x="315" y="739">设置</text></g>
+  </g>
+
+  <!-- 02A -->
+  <g transform="translate(520 250)">
+    <text x="0" y="-18" class="frameLabel">02A 手动起卦</text><text x="132" y="-18" class="note">同层模式 A</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <rect x="16" y="18" width="164" height="38" rx="4" fill="#171512"/><text x="98" y="42" text-anchor="middle" class="buttonText">手动</text><rect x="180" y="18" width="164" height="38" rx="4" class="outlineButton"/><text x="262" y="42" text-anchor="middle" class="label">自动铜钱</text>
+    <text x="20" y="92" class="small">六爻 · 记一事</text><text x="20" y="122" class="h1">手动起卦</text>
+    <rect x="16" y="142" width="328" height="76" rx="7" class="parch"/><text x="30" y="164" class="small">占问事项</text><text x="30" y="192" class="body">输入本次所问，排盘后自动存入本机</text>
+    <rect x="16" y="230" width="206" height="54" rx="6" class="paper" stroke="#b8ada0"/><text x="28" y="250" class="tiny">起卦日期</text><text x="28" y="270" class="body">2026-08-06</text><rect x="230" y="230" width="114" height="54" rx="6" class="paper" stroke="#b8ada0"/><text x="242" y="250" class="tiny">北京时间</text><text x="242" y="270" class="body">22:39</text>
+    <text x="20" y="318" class="label">六爻编辑</text><text x="334" y="318" text-anchor="end" class="tiny">界面上→下；记录初→上</text>
+    <rect x="16" y="330" width="328" height="286" rx="8" class="scroll"/>
+    <g class="label"><text x="30" y="362">上爻</text><text x="30" y="406">五爻</text><text x="30" y="450">四爻</text><text x="30" y="494">三爻</text><text x="30" y="538">二爻</text><text x="30" y="582">初爻</text></g>
+    <g stroke="#171512" stroke-width="6"><line x1="86" y1="356" x2="266" y2="356"/><line x1="86" y1="400" x2="158" y2="400"/><line x1="194" y1="400" x2="266" y2="400"/><line x1="86" y1="444" x2="266" y2="444"/><line x1="86" y1="488" x2="266" y2="488"/><line x1="86" y1="532" x2="158" y2="532"/><line x1="194" y1="532" x2="266" y2="532"/><line x1="86" y1="576" x2="266" y2="576"/></g>
+    <g><rect x="286" y="342" width="40" height="28" rx="4" fill="#9f3027"/><text x="306" y="361" text-anchor="middle" class="buttonText">动</text><rect x="286" y="386" width="40" height="28" rx="4" class="outlineButton"/><text x="306" y="405" text-anchor="middle" class="label">静</text><rect x="286" y="430" width="40" height="28" rx="4" class="outlineButton"/><text x="306" y="449" text-anchor="middle" class="label">静</text><rect x="286" y="474" width="40" height="28" rx="4" class="outlineButton"/><text x="306" y="493" text-anchor="middle" class="label">静</text><rect x="286" y="518" width="40" height="28" rx="4" class="outlineButton"/><text x="306" y="537" text-anchor="middle" class="label">静</text><rect x="286" y="562" width="40" height="28" rx="4" class="outlineButton"/><text x="306" y="581" text-anchor="middle" class="label">静</text></g>
+    <rect x="16" y="632" width="102" height="46" rx="5" class="outlineButton"/><text x="67" y="660" text-anchor="middle" class="label">重置</text><rect x="126" y="632" width="218" height="46" rx="5" class="button"/><text x="235" y="660" text-anchor="middle" class="buttonText">排盘并存档</text>
+    <line x1="0" y1="686" x2="360" y2="686" class="faint"/><g text-anchor="middle" class="nav"><text x="45" y="720">▦</text><text x="45" y="739">万年历</text><text x="135" y="720" class="navOn">䷀</text><text x="135" y="739" class="navOn">六爻</text><text x="225" y="720">▣</text><text x="225" y="739">档案</text><text x="315" y="720">☰</text><text x="315" y="739">设置</text></g>
+  </g>
+
+  <!-- 02B -->
+  <g transform="translate(980 250)">
+    <text x="0" y="-18" class="frameLabel">02B 自动铜钱</text><text x="142" y="-18" class="note">同层模式 B</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <rect x="16" y="18" width="164" height="38" rx="4" class="outlineButton"/><text x="98" y="42" text-anchor="middle" class="label">手动</text><rect x="180" y="18" width="164" height="38" rx="4" class="button"/><text x="262" y="42" text-anchor="middle" class="buttonText">自动铜钱</text>
+    <text x="20" y="92" class="small">六爻 · 三枚铜钱</text><text x="20" y="122" class="h1">自动起卦</text>
+    <rect x="16" y="142" width="328" height="74" rx="7" class="parch"/><text x="30" y="164" class="small">占问事项</text><text x="30" y="192" class="body">输入问题；六次投掷原值将完整保存</text>
+    <rect x="16" y="228" width="328" height="68" rx="7" class="paper" stroke="#b8ada0"/><text x="30" y="250" class="small">2026-08-06 · 22:39</text><text x="30" y="276" class="body">系统安全随机源 · 每爻三枚 2/3</text>
+    <path d="M24 330H336M32 324V564M328 324V564" class="line"/><rect x="24" y="324" width="312" height="246" class="scroll"/>
+    <text x="40" y="352" class="h2">投掷规则</text><text x="40" y="374" class="small">一次完成六爻；仍逐爻展示和归档</text>
+    <g class="body"><text x="40" y="410">上爻</text><text x="40" y="444">五爻</text><text x="40" y="478">四爻</text><text x="40" y="512">三爻</text><text x="40" y="546">二爻 / 初爻</text></g>
+    <g class="small" text-anchor="middle"><circle cx="132" cy="405" r="13" class="paper" stroke="#665f57"/><text x="132" y="409">2</text><circle cx="168" cy="405" r="13" class="paper" stroke="#665f57"/><text x="168" y="409">3</text><circle cx="204" cy="405" r="13" class="paper" stroke="#665f57"/><text x="204" y="409">3</text><text x="262" y="409">= 8 少阴</text><text x="168" y="444">待投掷</text><text x="168" y="478">待投掷</text><text x="168" y="512">待投掷</text><text x="168" y="546">……</text></g>
+    <rect x="16" y="606" width="328" height="54" rx="5" class="button"/><text x="180" y="638" text-anchor="middle" class="buttonText">开始摇卦并存档</text>
+    <line x1="0" y1="686" x2="360" y2="686" class="faint"/><g text-anchor="middle" class="nav"><text x="45" y="720">▦</text><text x="45" y="739">万年历</text><text x="135" y="720" class="navOn">䷀</text><text x="135" y="739" class="navOn">六爻</text><text x="225" y="720">▣</text><text x="225" y="739">档案</text><text x="315" y="720">☰</text><text x="315" y="739">设置</text></g>
+  </g>
+
+  <!-- 03A -->
+  <g transform="translate(60 1090)">
+    <text x="0" y="-18" class="frameLabel">03A 档案列表</text><text x="132" y="-18" class="note">按图一重排</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <text x="20" y="38" class="small">案例库</text><text x="20" y="75" class="h1">六爻档案</text><text x="20" y="96" class="tiny">本机持久保存 · 退出后台或重启后仍保留</text>
+    <rect x="16" y="116" width="328" height="46" rx="6" class="paper" stroke="#b8ada0"/><text x="34" y="144" class="small">⌕  搜索占问、卦名、解读或反馈</text>
+    <!-- Archive card 1 -->
+    <rect x="16" y="180" width="328" height="112" rx="12" class="scroll"/>
+    <rect x="28" y="196" width="72" height="80" rx="5" fill="#fbf8f0" stroke="#9f3027"/><path d="M38 206H90V266H38ZM46 214H82V258H46Z" class="seal"/><text x="64" y="240" text-anchor="middle" class="sealText">事</text><text x="64" y="257" text-anchor="middle" class="tiny">事业</text>
+    <rect x="112" y="196" width="218" height="42" rx="3" class="paper"/><text x="122" y="222" class="body">今年转岗是否顺利？</text>
+    <rect x="112" y="246" width="132" height="30" rx="3" class="paper"/><text x="122" y="265" class="small">2026-08-06 22:39</text><rect x="250" y="246" width="80" height="30" rx="3" class="paper"/><text x="290" y="265" text-anchor="middle" class="label">大畜 → 损</text>
+    <!-- Archive card 2 -->
+    <rect x="16" y="306" width="328" height="112" rx="12" class="parch"/>
+    <rect x="28" y="322" width="72" height="80" rx="5" fill="#fbf8f0" stroke="#171512"/><path d="M38 332H90V392H38ZM46 340H82V384H46Z" fill="none" stroke="#171512"/><text x="64" y="366" text-anchor="middle" class="sealText" fill="#171512">学</text><text x="64" y="383" text-anchor="middle" class="tiny">学业</text>
+    <rect x="112" y="322" width="218" height="42" rx="3" class="paper"/><text x="122" y="348" class="body">考试结果与后续计划</text>
+    <rect x="112" y="372" width="132" height="30" rx="3" class="paper"/><text x="122" y="391" class="small">2026-07-18 09:10</text><rect x="250" y="372" width="80" height="30" rx="3" class="paper"/><text x="290" y="391" text-anchor="middle" class="label">乾为天 · 静</text>
+    <!-- State inset -->
+    <rect x="16" y="444" width="328" height="112" rx="8" fill="#fbf8f0" stroke="#b8ada0" stroke-dasharray="4 4"/><text x="32" y="470" class="label">空态 / 错误态</text><text x="32" y="495" class="small">空态说明“完成起卦后自动保存在本机”</text><text x="32" y="518" class="small">读取错误保留原数据，显示原因和“重新读取”</text><text x="32" y="541" class="tiny">不把错误渲染成“没有档案”</text>
+    <rect x="16" y="584" width="328" height="48" rx="5" fill="url(#lattice)" stroke="#b8ada0"/><text x="180" y="613" text-anchor="middle" class="small">分类印记不是装饰头像，而是档案检索维度</text>
+    <line x1="0" y1="686" x2="360" y2="686" class="faint"/><g text-anchor="middle" class="nav"><text x="45" y="720">▦</text><text x="45" y="739">万年历</text><text x="135" y="720">䷀</text><text x="135" y="739">六爻</text><text x="225" y="720" class="navOn">▣</text><text x="225" y="739" class="navOn">档案</text><text x="315" y="720">☰</text><text x="315" y="739">设置</text></g>
+  </g>
+
+  <!-- 04A -->
+  <g transform="translate(520 1090)">
+    <text x="0" y="-18" class="frameLabel">04A 卦面详情</text><text x="132" y="-18" class="note">按图二重排 / 二级页</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <text x="20" y="34" class="body">‹</text><text x="44" y="34" class="h2">六爻卦面</text><text x="337" y="34" text-anchor="end" class="small jade">已存本机</text>
+    <rect x="14" y="52" width="332" height="54" rx="6" class="parch"/><text x="26" y="72" class="tiny">占问 · 2026-08-06 22:39</text><text x="26" y="94" class="body">今年转岗是否顺利？</text>
+    <rect x="14" y="114" width="332" height="58" rx="6" class="paper" stroke="#b8ada0"/><g text-anchor="middle"><text x="62" y="135" class="data">丙午</text><text x="140" y="135" class="data">乙未</text><text x="218" y="135" class="data">壬子</text><text x="296" y="135" class="data">辛亥</text><text x="62" y="157" class="tiny">寅卯空</text><text x="140" y="157" class="tiny">辰巳空</text><text x="218" y="157" class="tiny">寅卯空</text><text x="296" y="157" class="tiny">寅卯空</text></g>
+    <rect x="14" y="180" width="332" height="54" rx="6" class="scroll"/><g text-anchor="middle"><text x="70" y="201" class="tiny">本卦</text><text x="70" y="221" class="data">山天大畜 · 艮3</text><text x="180" y="201" class="tiny">伏卦</text><text x="180" y="221" class="data">泽山咸</text><text x="288" y="201" class="tiny">变卦</text><text x="288" y="221" class="data">山泽损 · 艮4</text></g>
+    <!-- ledger -->
+    <rect x="14" y="242" width="332" height="366" rx="5" class="paper" stroke="#665f57"/>
+    <g class="tiny" text-anchor="middle"><text x="31" y="260">六神</text><text x="77" y="260">伏神</text><text x="150" y="260">本卦</text><text x="219" y="260">爻/世应</text><text x="291" y="260">变卦</text></g>
+    <line x1="14" y1="268" x2="346" y2="268" class="line"/><line x1="49" y1="242" x2="49" y2="608" class="faint"/><line x1="110" y1="242" x2="110" y2="608" class="faint"/><line x1="191" y1="242" x2="191" y2="608" class="faint"/><line x1="240" y1="242" x2="240" y2="608" class="faint"/>
+    <g class="dash"><line x1="14" y1="324" x2="346" y2="324"/><line x1="14" y1="380" x2="346" y2="380"/><line x1="14" y1="436" x2="346" y2="436"/><line x1="14" y1="492" x2="346" y2="492"/><line x1="14" y1="548" x2="346" y2="548"/></g>
+    <line x1="14" y1="436" x2="346" y2="436" class="line"/>
+    <!-- six rows primary + secondary -->
+    <g text-anchor="middle"><g class="label"><text x="31" y="292">螣蛇</text><text x="31" y="348">勾陈</text><text x="31" y="404">朱雀</text><text x="31" y="460">青龙</text><text x="31" y="516">玄武</text><text x="31" y="572">白虎</text></g>
+    <g class="data"><text x="79" y="289">兄弟未</text><text x="79" y="345">子孙酉</text><text x="79" y="401">妻财亥</text><text x="79" y="457">子孙申</text><text x="79" y="513">父母午</text><text x="79" y="569">兄弟辰</text><text x="150" y="289">官鬼寅</text><text x="150" y="345">妻财子</text><text x="150" y="401">兄弟戌</text><text x="150" y="457">兄弟辰</text><text x="150" y="513">官鬼寅</text><text x="150" y="569">妻财子</text><text x="291" y="289">官鬼寅</text><text x="291" y="345">妻财子</text><text x="291" y="401">兄弟戌</text><text x="291" y="457">兄弟丑</text><text x="291" y="513">官鬼卯</text><text x="291" y="569">父母巳</text></g>
+    <g class="data2"><text x="79" y="307">土 · 墓 · 参</text><text x="79" y="363">金 · 帝旺 · 井</text><text x="79" y="419">水 · 临官 · 鬼</text><text x="79" y="475">金 · 帝旺 · 柳</text><text x="79" y="531">火 · 长生 · 星</text><text x="79" y="587">土 · 墓 · 张</text><text x="150" y="307">木 · 病 · 参</text><text x="150" y="363">水 · 临官 · 井</text><text x="150" y="419">土 · 墓 · 鬼</text><text x="150" y="475">土 · 墓 · 柳</text><text x="150" y="531">木 · 病 · 星</text><text x="150" y="587">水 · 临官 · 张</text><text x="291" y="307">木 · 病</text><text x="291" y="363">水 · 临官</text><text x="291" y="419">土 · 墓</text><text x="291" y="475">土 · 衰</text><text x="291" y="531">木 · 死</text><text x="291" y="587">火 · 绝</text></g></g>
+    <g stroke="#171512" stroke-width="4"><line x1="201" y1="286" x2="229" y2="286"/><line x1="201" y1="342" x2="211" y2="342"/><line x1="219" y1="342" x2="229" y2="342"/><line x1="201" y1="398" x2="211" y2="398"/><line x1="219" y1="398" x2="229" y2="398"/><line x1="201" y1="454" x2="229" y2="454"/><line x1="201" y1="510" x2="229" y2="510"/><line x1="201" y1="566" x2="229" y2="566"/></g>
+    <g text-anchor="middle" class="label"><text x="234" y="459" fill="#9f3027">Ｏ</text><text x="215" y="477">应</text><text x="215" y="533">世</text></g>
+    <rect x="14" y="618" width="332" height="38" rx="5" class="parch"/><text x="28" y="642" class="label">十二长生 / 神煞摘要</text><text x="332" y="642" text-anchor="end" class="body">⌄</text>
+    <rect x="14" y="664" width="160" height="38" rx="5" class="outlineButton"/><text x="94" y="688" text-anchor="middle" class="label">解读与反馈</text><rect x="182" y="664" width="164" height="38" rx="5" class="button"/><text x="264" y="688" text-anchor="middle" class="buttonText">查看计算明细</text>
+    <text x="180" y="734" text-anchor="middle" class="tiny">二级页隐藏底栏 · 返回到起卦页或档案列表</text>
+  </g>
+
+  <!-- 05A -->
+  <g transform="translate(980 1090)">
+    <text x="0" y="-18" class="frameLabel">05A 解读与反馈</text><text x="155" y="-18" class="note">卦面下半部 / 可编辑</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <text x="20" y="36" class="body">‹</text><text x="44" y="36" class="h2">解读与反馈</text><text x="334" y="36" text-anchor="end" class="small">大畜 → 损</text>
+    <path d="M20 72H340M28 66V340M332 66V340" class="line"/><rect x="20" y="66" width="320" height="280" class="scroll"/>
+    <text x="36" y="96" class="h2">解读信息</text><text x="324" y="96" text-anchor="end" class="small">当前版本 v2</text>
+    <line x1="36" y1="110" x2="324" y2="110" class="faint"/><text x="36" y="138" class="body">先记录判断，再根据后续事实更新反馈。</text>
+    <rect x="36" y="158" width="288" height="116" rx="5" class="paper" stroke="#b8ada0"/><text x="48" y="182" class="small">编辑本次解读……</text><path d="M48 204H304M48 226H286M48 248H296" class="faint"/>
+    <rect x="204" y="288" width="120" height="40" rx="5" class="button"/><text x="264" y="313" text-anchor="middle" class="buttonText">保存新版本</text>
+    <path d="M20 382H340M28 376V646M332 376V646" class="line"/><rect x="20" y="376" width="320" height="276" class="parch"/>
+    <text x="36" y="406" class="h2">反馈时间线</text><rect x="254" y="388" width="70" height="30" rx="4" class="outlineButton"/><text x="289" y="407" text-anchor="middle" class="label">＋反馈</text>
+    <circle cx="48" cy="454" r="5" class="jade"/><line x1="48" y1="459" x2="48" y2="554" class="faint"/><text x="68" y="448" class="label">部分应验</text><text x="68" y="468" class="tiny">2026-09-20</text><text x="68" y="492" class="body">岗位有调整，但地点尚未确定。</text>
+    <circle cx="48" cy="558" r="5" class="red"/><text x="68" y="552" class="label">待验证</text><text x="68" y="572" class="tiny">2026-08-06</text><text x="68" y="596" class="body">等待正式通知。</text>
+    <rect x="20" y="680" width="320" height="44" rx="5" fill="url(#lattice)" stroke="#b8ada0"/><text x="180" y="707" text-anchor="middle" class="small">解读是判断；反馈是后续事实，不混写</text>
+  </g>
+
+  <!-- 06A -->
+  <g transform="translate(60 1930)">
+    <text x="0" y="-18" class="frameLabel">06A 导出档案</text><text x="132" y="-18" class="note">底部抽屉 / 二级动作</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect width="360" height="760" rx="24" fill="#171512" opacity=".18"/>
+    <rect x="12" y="264" width="336" height="484" rx="16" class="paper" stroke="#171512"/>
+    <line x1="154" y1="280" x2="206" y2="280" stroke="#665f57" stroke-width="3"/>
+    <text x="28" y="322" class="h1">导出档案</text><text x="28" y="348" class="small">选择一种可离线保存或分享的格式</text>
+    <rect x="24" y="376" width="312" height="84" rx="8" class="scroll"/><text x="42" y="408" class="h2">Markdown</text><text x="42" y="432" class="small">适合阅读、打印与长期整理</text><circle cx="310" cy="418" r="10" fill="#9f3027"/><circle cx="310" cy="418" r="4" class="paper"/>
+    <rect x="24" y="472" width="312" height="84" rx="8" class="parch"/><text x="42" y="504" class="h2">JSON</text><text x="42" y="528" class="small">完整结构化数据，适合备份与迁移</text><circle cx="310" cy="514" r="10" fill="none" stroke="#665f57"/>
+    <rect x="24" y="574" width="312" height="74" rx="7" fill="#fbf8f0" stroke="#b8ada0"/><text x="38" y="598" class="label">将包含</text><text x="38" y="620" class="tiny">占问、时间、起卦原始记录、完整卦面、解读、反馈、规则版本</text><text x="38" y="640" class="tiny">文件只在点击导出后交给系统分享面板</text>
+    <rect x="24" y="670" width="92" height="48" rx="5" class="outlineButton"/><text x="70" y="699" text-anchor="middle" class="label">取消</text><rect x="126" y="670" width="210" height="48" rx="5" class="button"/><text x="231" y="699" text-anchor="middle" class="buttonText">生成并分享</text>
+  </g>
+
+  <!-- 07A -->
+  <g transform="translate(520 1930)">
+    <text x="0" y="-18" class="frameLabel">07A 设置与本地数据</text><text x="182" y="-18" class="note">一级页</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <text x="20" y="40" class="small">基础设置</text><text x="20" y="78" class="h1">设置</text>
+    <rect x="16" y="104" width="328" height="118" rx="9" class="scroll"/><rect x="30" y="122" width="54" height="54" rx="5" fill="url(#lattice)" stroke="#9f3027"/><text x="57" y="157" text-anchor="middle" class="sealText">离线</text><text x="100" y="138" class="h2">完全离线运行</text><text x="100" y="160" class="small">万年历、排盘、档案均在本机</text><text x="100" y="184" class="tiny">不申请网络权限 · 不需要服务器</text>
+    <rect x="16" y="238" width="328" height="118" rx="9" class="parch"/><text x="32" y="268" class="h2">本地档案</text><text x="32" y="294" class="small">App 私有持久目录 · 当前 2 条</text><text x="32" y="318" class="tiny">退出后台、划掉任务或重启后仍保留</text><text x="32" y="338" class="tiny red">卸载应用或清除应用数据会删除</text>
+    <rect x="16" y="372" width="328" height="74" rx="8" class="paper" stroke="#b8ada0"/><text x="32" y="400" class="h2">规则与版本</text><text x="32" y="424" class="small">App 1.0.1 · schema v13 · 离线引擎 0.13</text>
+    <rect x="16" y="460" width="328" height="74" rx="8" class="paper" stroke="#b8ada0"/><text x="32" y="488" class="h2">显示偏好</text><text x="32" y="512" class="small">字体大小 · 五行辅助色 · 减少动态效果</text>
+    <rect x="16" y="550" width="156" height="46" rx="5" class="outlineButton"/><text x="94" y="578" text-anchor="middle" class="label">导出单个档案</text><rect x="188" y="550" width="156" height="46" rx="5" fill="#e5e0d7" stroke="#b8ada0"/><text x="266" y="578" text-anchor="middle" class="small">批量备份 · 后续</text>
+    <rect x="16" y="614" width="328" height="44" rx="5" fill="url(#lattice)" stroke="#b8ada0"/><text x="180" y="641" text-anchor="middle" class="small">不暴露 Python / Node 等开发期信息</text>
+    <line x1="0" y1="686" x2="360" y2="686" class="faint"/><g text-anchor="middle" class="nav"><text x="45" y="720">▦</text><text x="45" y="739">万年历</text><text x="135" y="720">䷀</text><text x="135" y="739">六爻</text><text x="225" y="720">▣</text><text x="225" y="739">档案</text><text x="315" y="720" class="navOn">☰</text><text x="315" y="739" class="navOn">设置</text></g>
+  </g>
+
+  <!-- 08A system board -->
+  <g transform="translate(980 1930)">
+    <text x="0" y="-18" class="frameLabel">08A Design System 样板</text><text x="214" y="-18" class="note">组件与状态</text>
+    <rect width="360" height="760" rx="24" class="phone"/><rect x="1" y="1" width="358" height="758" rx="23" fill="url(#riceGrid)" opacity=".8"/>
+    <text x="20" y="40" class="small">视觉语法</text><text x="20" y="76" class="h1">水墨格物</text>
+    <rect x="16" y="100" width="328" height="90" rx="8" fill="url(#lattice)" stroke="#b8ada0"/><rect x="28" y="116" width="70" height="58" class="paper" stroke="#171512"/><text x="63" y="150" text-anchor="middle" class="sealText">卦</text><text x="116" y="130" class="h2">中式窗棂网格</text><text x="116" y="152" class="small">只组织边界与留白</text><text x="116" y="171" class="tiny">纹样透明度 ≤ 18%</text>
+    <text x="20" y="222" class="label">墨色与纸色</text><g><rect x="20" y="238" width="48" height="48" fill="#171512"/><rect x="76" y="238" width="48" height="48" fill="#332e29"/><rect x="132" y="238" width="48" height="48" fill="#665f57"/><rect x="188" y="238" width="48" height="48" fill="#f3ebdd" stroke="#b8ada0"/><rect x="244" y="238" width="48" height="48" fill="#e5d2ad" stroke="#b8ada0"/><rect x="300" y="238" width="40" height="48" fill="#9f3027"/></g>
+    <path d="M20 326H340M28 320V442M332 320V442" class="line"/><rect x="20" y="320" width="320" height="128" class="scroll"/><text x="36" y="350" class="h2">羊皮纸卷容器</text><text x="36" y="376" class="body">承载卦面、解读和长内容</text><text x="36" y="400" class="small">双线与端头表达卷轴，不用写实贴图</text><text x="36" y="424" class="tiny">展开 180–240ms；减少动态时瞬时切换</text>
+    <text x="20" y="486" class="label">按钮</text><rect x="20" y="502" width="154" height="46" rx="5" class="button"/><text x="97" y="530" text-anchor="middle" class="buttonText">主操作</text><rect x="186" y="502" width="154" height="46" rx="5" class="outlineButton"/><text x="263" y="530" text-anchor="middle" class="label">次操作</text>
+    <text x="20" y="584" class="label">状态不能只靠颜色</text><g class="small"><text x="24" y="612" fill="#9f3027">Ｏ 动爻</text><text x="106" y="612" class="jade">✓ 已存本机</text><text x="210" y="612">世 / 应</text><text x="282" y="612">⌄ 折叠</text></g>
+    <rect x="16" y="640" width="328" height="64" rx="7" class="paper" stroke="#b8ada0"/><text x="30" y="666" class="label">正文不使用篆书</text><text x="30" y="688" class="small">印章字只用于一至四字分类；数据使用宋体/黑体</text>
+    <text x="180" y="738" text-anchor="middle" class="tiny">完整 token 与无障碍约束见 DESIGN.md</text>
+  </g>
+
+  <text x="60" y="2780" class="note">评审方式：请按 01A–08A 页面编号反馈。确认流程与层级后，才提取 formal 正式稿并进入高保真/Flutter 实现。</text>
+</svg>

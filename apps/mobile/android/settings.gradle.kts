@@ -11,9 +11,19 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        maven("https://maven.aliyun.com/repository/google")
         google()
         mavenCentral()
         gradlePluginPortal()
+    }
+}
+
+// Google Maven is not directly reachable on every review machine. Inject the
+// HTTPS mirror before plugin subprojects evaluate their own buildscript blocks;
+// the official repository remains configured as the fallback below.
+gradle.beforeProject {
+    buildscript.repositories {
+        maven("https://maven.aliyun.com/repository/google")
     }
 }
 

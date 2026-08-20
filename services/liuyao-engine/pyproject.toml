@@ -5,13 +5,18 @@ description = "Stateless Liuyao casting engine for 六爻存档"
 requires-python = ">=3.12"
 dependencies = [
   "arrow==1.4.0",
+  "cnlunar==0.2.0",
   "fastapi>=0.127,<1",
   "najia==2.0.1",
   "uvicorn>=0.35,<1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10"]
+dev = [
+  "httpx2>=2,<3",
+  "pytest>=8,<10",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

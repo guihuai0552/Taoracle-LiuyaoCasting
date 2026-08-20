@@ -9,3 +9,6 @@ services/liuyao-engine/.venv/
 __pycache__/
 *.py[cod]
 node_modules/
+*.apk
+.worktrees/
+conversations/
