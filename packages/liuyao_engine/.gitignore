@@ -1,0 +1,4 @@
+# Dart build artifacts
+.dart_tool/
+build/
+.pub/
