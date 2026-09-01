@@ -81,7 +81,9 @@ const _earthSourcePhases = <String, Map<String, List<String>>>{
   },
 };
 
-const _growthAliases = {'生': '长生', '王': '帝旺', '葬': '墓'};
+/// 《五行大义》原始段名 → 标准十二长生段名（display 层统一，source 保留原文）。
+/// 受气即标准「绝」位（四土表跨两支）；衰病为原文合并段，无对应单一标准段，保留原样。
+const _growthAliases = {'生': '长生', '王': '帝旺', '葬': '墓', '受气': '绝'};
 
 Map<String, dynamic> lookupPrivateBranchGrowth(
   String subjectBranch,
@@ -112,6 +114,32 @@ Map<String, dynamic> lookupPrivateBranchGrowth(
       for (final phase in sourcePhases) _growthAliases[phase] ?? phase,
     ],
     'rule_id': 'twelve-growth.branch-subject-lookup',
+  };
+}
+
+/// 以「五行」为主体的十二长生查询：观察该五行在各爻地支上的状态。
+///
+/// 与 [lookupPrivateBranchGrowth]（主体=地支）互补：卦面标注的
+/// 「五行参照」语义是「木在亥长生、在卯帝旺…」，即主体为所选五行、
+/// 观察支为爻支。土无单一四土表（四土表以丑辰未戌各自为主体），
+/// 此处按引擎通用土表（长生在申）取值。
+Map<String, dynamic> lookupElementGrowth(
+  String element,
+  String observedBranch,
+) {
+  if (!twelveStagesTable.containsKey(element) ||
+      !branchElements.containsKey(observedBranch)) {
+    throw ArgumentError('五行主体必须是木火土金水，观察支必须是合法地支');
+  }
+  final stage = twelveStagesTable[element]![observedBranch]!;
+  return {
+    'profile': privateGrowthProfile,
+    'subject': {'element': element, 'branch': null},
+    'observed_branch': observedBranch,
+    'source_model': 'element_subject_cycle',
+    'source_phases': [stage],
+    'display_phases': [_growthAliases[stage] ?? stage],
+    'rule_id': 'twelve-growth.element-subject-lookup',
   };
 }
 

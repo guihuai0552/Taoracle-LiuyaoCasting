@@ -65,14 +65,12 @@ abstract class ArchiveDataSource {
     required CastPreview preview,
   });
   Future<CaseDetail> getCase(String id);
+  Future<void> deleteCase(String id);
   Future<void> updateQuestionContext({
     required String caseId,
     required String context,
   });
-  Future<void> updateTags({
-    required String caseId,
-    required List<String> tags,
-  });
+  Future<void> updateTags({required String caseId, required List<String> tags});
   Future<void> appendUserAnalysis({
     required String caseId,
     required String body,
@@ -346,24 +344,27 @@ class ArchiveClient implements ArchiveDataSource {
         .map((tag) => tag.trim())
         .where((tag) => tag.isNotEmpty)
         .toSet();
-    final filtered = items.where((json) {
-      final textMatches = q.isEmpty ||
-          [
-            json['title'] as String? ?? '',
-            json['question'] as String? ?? '',
-            json['baseHexagram'] as String? ?? '',
-            json['changedHexagram'] as String? ?? '',
-            for (final analysis in json['analyses'] as List? ?? const [])
-              (analysis as Map)['body'] as String? ?? '',
-            for (final feedback in json['feedbacks'] as List? ?? const [])
-              (feedback as Map)['body'] as String? ?? '',
-          ].join('\n').contains(q);
-      if (!textMatches) return false;
-      // 标签筛选：档案必须包含全部已选 Tag。
-      if (activeTags.isEmpty) return true;
-      final caseTags = _stringTags(json['tags']).toSet();
-      return activeTags.every(caseTags.contains);
-    }).toList(growable: false);
+    final filtered = items
+        .where((json) {
+          final textMatches =
+              q.isEmpty ||
+              [
+                json['title'] as String? ?? '',
+                json['question'] as String? ?? '',
+                json['baseHexagram'] as String? ?? '',
+                json['changedHexagram'] as String? ?? '',
+                for (final analysis in json['analyses'] as List? ?? const [])
+                  (analysis as Map)['body'] as String? ?? '',
+                for (final feedback in json['feedbacks'] as List? ?? const [])
+                  (feedback as Map)['body'] as String? ?? '',
+              ].join('\n').contains(q);
+          if (!textMatches) return false;
+          // 标签筛选：档案必须包含全部已选 Tag。
+          if (activeTags.isEmpty) return true;
+          final caseTags = _stringTags(json['tags']).toSet();
+          return activeTags.every(caseTags.contains);
+        })
+        .toList(growable: false);
     return filtered
         .map((json) => CaseSummary.fromJson(json))
         .toList(growable: false);
@@ -477,6 +478,15 @@ class ArchiveClient implements ArchiveDataSource {
       throw Exception('找不到案例：$id');
     }
     return CaseDetail.fromJson(json);
+  }
+
+  @override
+  Future<void> deleteCase(String id) async {
+    await _ensureLoaded();
+    final json = _store[id];
+    if (json == null) throw Exception('找不到案例：$id');
+    _store.remove(id);
+    await _persist();
   }
 
   @override

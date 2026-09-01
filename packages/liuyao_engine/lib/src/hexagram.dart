@@ -80,6 +80,42 @@ const Map<String, String> gua64 = {
   '000010': '水地比',
 };
 
+/// 六冲卦码集合（8纯卦 + 天雷无妄、雷天大壮，共 10 卦）。
+/// 六冲：上下卦相冲，六爻皆冲，主事快、散、变。
+const Set<String> liuChongCodes = {
+  '111111', // 乾为天
+  '000000', // 坤为地
+  '100100', // 震为雷
+  '011011', // 巽为风
+  '010010', // 坎为水
+  '101101', // 离为火
+  '001001', // 艮为山
+  '110110', // 兑为泽
+  '100111', // 天雷无妄
+  '111100', // 雷天大壮
+};
+
+/// 六合卦码集合（8 卦）。
+/// 六合：六爻两两相合，主事缓、久、合。
+const Set<String> liuHeCodes = {
+  '000111', // 天地否
+  '111000', // 地天泰
+  '000110', // 泽地萃
+  '110000', // 地泽临
+  '001010', // 水山蹇
+  '110001', // 山泽损
+  '000101', // 火地晋
+  '101000', // 地火明夷
+};
+
+/// 判断卦码对应的六冲/六合属性。
+/// 返回 '六冲' / '六合'；两者皆非返回 null。
+String? hexagramProperty(String code) {
+  if (liuChongCodes.contains(code)) return '六冲';
+  if (liuHeCodes.contains(code)) return '六合';
+  return null;
+}
+
 /// ============================================================================
 /// 世应定位算法（_shi_ying）
 /// ============================================================================
@@ -443,6 +479,9 @@ Map<String, dynamic> buildBaseChart(
       'hexagram_kind': cShiYing.kind,
       'shi_position': cShiYing.shi,
       'ying_position': cShiYing.ying,
+      'liu_chong': liuChongCodes.contains(changedCode),
+      'liu_he': liuHeCodes.contains(changedCode),
+      'hexagram_property': hexagramProperty(changedCode),
       'relative_basis': 'base_palace',
       'relative_basis_element': palace['element'],
       'lines': changedLines,
@@ -501,6 +540,9 @@ Map<String, dynamic> buildBaseChart(
       'shi_position': shiYing.shi,
       'ying_position': shiYing.ying,
       'moving_positions': movingPositions,
+      'liu_chong': liuChongCodes.contains(code),
+      'liu_he': liuHeCodes.contains(code),
+      'hexagram_property': hexagramProperty(code),
       'hidden_hexagram': hiddenHexagram,
       'lines': baseLines,
     },

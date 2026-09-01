@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/design_system/tokens/ds_colors.dart';
 import '../../ui/liuyao_design.dart';
 import '../archive/archive_client.dart';
 import '../archive/case_detail_page.dart';
+import '../settings/app_preferences.dart';
 import 'casting_client.dart';
 
 const _ink = LiuyaoColors.ink;
@@ -98,15 +100,13 @@ class _AutomaticCastingPageState extends State<AutomaticCastingPage> {
   }
 
   Future<void> _reviewAndCast() async {
-    final question = _questionController.text.trim();
-    if (question.isEmpty) {
-      setState(() => _error = '请先填写占问事项');
-      return;
-    }
-    if (question.length > 1000) {
+    // 问念可空（2026-09-01 需求）：留空时默认「暂无问念」。
+    final rawQuestion = _questionController.text.trim();
+    if (rawQuestion.length > 1000) {
       setState(() => _error = '占问事项不能超过 1000 字');
       return;
     }
+    final question = rawQuestion.isEmpty ? '暂无问念' : rawQuestion;
     FocusScope.of(context).unfocus();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -121,7 +121,7 @@ class _AutomaticCastingPageState extends State<AutomaticCastingPage> {
           FilledButton(
             key: const Key('confirm-automatic-cast'),
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: _cinnabar),
+            style: FilledButton.styleFrom(backgroundColor: LiuyaoColors.cinnabar),
             child: const Text('确认开始'),
           ),
         ],
@@ -140,6 +140,8 @@ class _AutomaticCastingPageState extends State<AutomaticCastingPage> {
       final preview = await _dataSource.previewAutomatic(
         question: question,
         dateTime: _dateTime,
+        dayBoundary: currentPreferences.dayBoundaryStrategy,
+        monthBoundary: currentPreferences.monthBoundaryStrategy,
       );
       final detail = await _archiveClient.saveCast(
         question: question,
@@ -179,8 +181,6 @@ class _AutomaticCastingPageState extends State<AutomaticCastingPage> {
         key: const Key('automatic-casting-scroll'),
         padding: const EdgeInsets.fromLTRB(14, 18, 14, 28),
         children: [
-          _buildHeader(),
-          const SizedBox(height: 18),
           _buildQuestion(),
           const SizedBox(height: 12),
           _buildDateTime(),
@@ -195,8 +195,8 @@ class _AutomaticCastingPageState extends State<AutomaticCastingPage> {
             key: const Key('automatic-cast'),
             onPressed: _submitting ? null : _reviewAndCast,
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-              backgroundColor: _cinnabar,
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: LiuyaoColors.cinnabar,
             ),
             icon: _submitting
                 ? const SizedBox.square(
@@ -214,34 +214,6 @@ class _AutomaticCastingPageState extends State<AutomaticCastingPage> {
     );
   }
 
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '六爻',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: _cinnabar,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 3,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '自动铜钱',
-          key: const Key('automatic-casting-title'),
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-            color: _ink,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1,
-          ),
-        ),
-        const SizedBox(height: 6),
-        const Text('一次完成六爻，逐枚保留原始数值', style: TextStyle(color: _mutedInk)),
-      ],
-    );
-  }
-
   Widget _buildQuestion() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -254,7 +226,7 @@ class _AutomaticCastingPageState extends State<AutomaticCastingPage> {
         maxLength: 1000,
         decoration: const InputDecoration(
           labelText: '占问事项',
-          hintText: '写清楚对象、背景和想确认的问题',
+          hintText: '可不填，留空记为「暂无问念」；写清楚对象与背景更好',
           border: InputBorder.none,
           counterText: '',
         ),
@@ -341,7 +313,7 @@ class _AutomaticMethodCard extends StatelessWidget {
               children: [
                 Text(
                   '三枚铜钱 × 六次',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -370,15 +342,15 @@ class _MiniCoin extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: value == 3 ? _ink : const Color(0xFFE4D3BC),
-        border: Border.all(color: const Color(0x557C5C34)),
+        color: value == 3 ? _ink : _softPaper,
+        border: Border.all(color: _rule),
       ),
       child: Text(
         '$value',
         style: TextStyle(
           color: value == 3 ? Colors.white : _ink,
           fontSize: 10,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -443,7 +415,7 @@ class _InlineError extends StatelessWidget {
       key: const Key('automatic-error'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEDEA),
+        color: DSColors.glowCinnabar,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

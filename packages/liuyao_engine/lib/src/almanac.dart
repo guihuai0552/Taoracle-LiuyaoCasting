@@ -576,11 +576,16 @@ Map<String, dynamic> calculateAlmanac(
   final dayGanzhi = calculateDayGanzhi(wallClock, dayBoundary: dayBoundary);
   final currentTwoHourIndex = (wallClock.hour + 1) ~/ 2;
   final dayCycleIndex = the60HeavenlyEarth.indexOf(dayGanzhi);
+
+  // 13 时辰的日柱归属（对齐 cnlunar twohour8CharList 语义）：
+  // index 0-11（子正→亥）用当前时刻日柱 dayGanzhi 起时干；
+  // index 12（23 点子初）用次日日柱（dayCycleIndex+1）起子时。
+  // 这样「子初 / 子正」干支不同，不再重复同一时辰。
+  final nextDayCycleIndex = (dayCycleIndex + 1) % 60;
   final twoHourPillars = List.generate(13, (index) {
-    // The thirteenth entry repeats 子时 for the 23:00 split.  cnlunar has
-    // already advanced day8Char at 23:00, so it must use branch index 0.
+    final cycleIndex = index == 12 ? nextDayCycleIndex : dayCycleIndex;
     final branchIndex = index == 12 ? 0 : index;
-    final ganzhi = the60HeavenlyEarth[(dayCycleIndex * 12 + branchIndex) % 60];
+    final ganzhi = the60HeavenlyEarth[(cycleIndex * 12 + branchIndex) % 60];
     return {
       'index': index,
       'ganzhi': ganzhi,
@@ -589,7 +594,15 @@ Map<String, dynamic> calculateAlmanac(
       'selected': index == currentTwoHourIndex,
     };
   });
-  final hourGanzhi = twoHourPillars[currentTwoHourIndex]['ganzhi'] as String;
+  // 时柱独立计算：按当前时刻日柱与时支（保持 dayBoundary 口径），
+  // 不随展示列表 index 12 的次日日柱变化。
+  final hourGanzhi =
+      calculateHourGanzhi13(
+            dayGanzhi,
+            wallClock.hour,
+            wallClock.minute,
+          )['ganzhi']
+          as String;
   final terms = solarTermSnapshot(wallClock);
   final normalizedLocalTimestamp = formatShanghaiInstantIso(timestamp);
   final dailyMansion = calculateDailyMansion(timestamp);

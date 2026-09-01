@@ -7,7 +7,8 @@
 library;
 
 import 'constants.dart';
-import 'private_reference.dart' show lookupPrivateBranchGrowth;
+import 'private_reference.dart'
+    show lookupElementGrowth, lookupPrivateBranchGrowth;
 
 const _annotationPackageId = 'liuyao.annotations.wuxing_changsheng.v2';
 const _luShenPackageId = 'liuyao.shensha.lushen_day_stem.v1';
@@ -47,7 +48,6 @@ const _elementReferenceOrder = [
   'element:水',
   'element:土',
 ];
-const _elementStartBranch = {'木': '亥', '火': '寅', '金': '巳', '水': '申', '土': '寅'};
 
 Map<String, dynamic> buildFiveElementTwelveStages(
   List<Map<String, dynamic>> lines,
@@ -92,13 +92,12 @@ Map<String, dynamic> buildFiveElementTwelveStages(
     }
     for (final refKey in _elementReferenceOrder) {
       final elementName = refKey.substring('element:'.length);
-      final subjectBranch = line['earthly_branch'] as String;
-      final isEarthSubject = element == '土';
-      // 土爻按四土独立表（观察支取自身地支）；非土爻按该五行长生起点。
-      final observedBranch = isEarthSubject
-          ? subjectBranch
-          : _elementStartBranch[elementName]!;
-      final growth = lookupPrivateBranchGrowth(subjectBranch, observedBranch);
+      final observedBranch = line['earthly_branch'] as String;
+      // 五行参照（2026-09-01 修正）：主体为所选五行、观察支为爻支——
+      // 即「木在亥长生、在卯帝旺…」。旧实现以爻支为主体、固定观察该
+      // 五行长生起点，结果只随爻支自身五行变化（火/土参照完全同值、
+      // 土爻恒帝旺），不符合五行主体语义。
+      final growth = lookupElementGrowth(elementName, observedBranch);
       final sourcePhases = (growth['source_phases'] as List).cast<String>();
       final displayPhases = (growth['display_phases'] as List).cast<String>();
       final stage = displayPhases.join('、');
@@ -113,7 +112,7 @@ Map<String, dynamic> buildFiveElementTwelveStages(
         'display_phases': displayPhases,
       });
       steps.add(
-        '${line['position_name']}$element：五行参照${elementName}（观察支$observedBranch） → $stage',
+        '${line['position_name']}$element：五行$elementName 主体观察爻支$observedBranch → $stage',
       );
     }
     lineResults.add({

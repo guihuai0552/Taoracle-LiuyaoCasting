@@ -7,7 +7,11 @@ import 'features/almanac/almanac_page.dart';
 import 'features/archive/archive_page.dart';
 import 'features/casting/casting_client.dart';
 import 'features/casting/casting_page.dart';
+import 'features/settings/app_preferences.dart';
+import 'features/settings/calendar_policy_sheet.dart';
 import 'features/settings/settings_page.dart';
+import 'ui/design_system/components/ds_bottom_navigation.dart';
+import 'ui/design_system/components/liuyao_icon.dart';
 import 'ui/liuyao_design.dart';
 
 class LiuyaoArchiveApp extends StatelessWidget {
@@ -24,7 +28,7 @@ class LiuyaoArchiveApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: '六爻工具',
+      title: '道谕六爻',
       theme: buildLiuyaoTheme(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -62,6 +66,9 @@ class _HomeShellState extends State<HomeShell> {
   /// 万年历选中的日期草稿，切换至起卦页时自动带入。
   DateTime? _sharedCastingDate;
 
+  /// 首次口径弹窗守卫：避免重复触发。
+  bool _policyPromptInFlight = false;
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +81,8 @@ class _HomeShellState extends State<HomeShell> {
       null,
       null,
     ];
+    // 启动即加载偏好（幂等）；首次进入六爻前完成口径确认。
+    loadPreferences();
   }
 
   void _onAlmanacDateSelected(DateTime date) {
@@ -95,6 +104,38 @@ class _HomeShellState extends State<HomeShell> {
     };
   }
 
+  Future<void> _maybePromptCalendarPolicy() async {
+    if (_policyPromptInFlight) return;
+    final prefs = currentPreferences;
+    if (prefs.calendarPolicySetupCompleted) return;
+    _policyPromptInFlight = true;
+    try {
+      final selection = await showCalendarPolicySheet(
+        context,
+        initialDayBoundary: prefs.dayBoundaryStrategy,
+        initialMonthBoundary: prefs.monthBoundaryStrategy,
+        title: '先选择历法口径',
+        // 首次为强制选择：不允许点外部关闭。
+        barrierDismissible: false,
+      );
+      if (selection == null) {
+        // 首次不允许跳过：回退日历页等待下次进入。
+        if (!mounted) return;
+        setState(() => _index = 0);
+        return;
+      }
+      await savePreferences(
+        prefs.copyWith(
+          calendarPolicySetupCompleted: true,
+          dayBoundaryStrategy: selection.dayBoundary,
+          monthBoundaryStrategy: selection.monthBoundary,
+        ),
+      );
+    } finally {
+      _policyPromptInFlight = false;
+    }
+  }
+
   void _selectDestination(int value) {
     setState(() {
       _index = value;
@@ -104,6 +145,11 @@ class _HomeShellState extends State<HomeShell> {
         _pages[value] ??= _createPage(value);
       }
     });
+    if (value == 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _maybePromptCalendarPolicy();
+      });
+    }
   }
 
   @override
@@ -117,29 +163,34 @@ class _HomeShellState extends State<HomeShell> {
               .toList(growable: false),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: DSBottomNavigation(
         selectedIndex: _index,
         onDestinationSelected: _selectDestination,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month_rounded),
+        destinations: [
+          DSDestinationItem(
             label: '日历',
+            icon: Icons.calendar_month_outlined,
+            selectedIcon: Icons.calendar_month_rounded,
+            svgIcon: LiuyaoIconType.calendar,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.view_agenda_outlined),
-            selectedIcon: Icon(Icons.view_agenda_rounded),
+          DSDestinationItem(
             label: '六爻',
+            icon: Icons.view_agenda_outlined,
+            selectedIcon: Icons.view_agenda_rounded,
+            svgIcon: LiuyaoIconType.divination,
+            itemKey: const Key('nav-liuyao'),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
+          DSDestinationItem(
             label: '档案',
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            svgIcon: LiuyaoIconType.archive,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune_rounded),
+          DSDestinationItem(
             label: '设置',
+            icon: Icons.tune_outlined,
+            selectedIcon: Icons.tune_rounded,
+            svgIcon: LiuyaoIconType.settings,
           ),
         ],
       ),

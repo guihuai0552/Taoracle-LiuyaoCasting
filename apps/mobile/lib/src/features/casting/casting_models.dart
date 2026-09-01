@@ -1,3 +1,5 @@
+import 'package:liuyao_engine/liuyao_engine.dart' as engine;
+
 class CastPreview {
   const CastPreview({
     required this.schemaVersion,
@@ -233,7 +235,7 @@ class CastPreview {
             name: palaceName,
             element: palaceElement,
           ),
-          palaceSequence: 0,
+          palaceSequence: _legacyPalaceSequence(baseJson),
           hexagramKind: 'legacy',
           shiPosition: shiPosition,
           yingPosition: yingPosition,
@@ -286,7 +288,8 @@ class CastPreview {
 
   bool get isLegacySnapshot => schemaVersion < 3;
   bool get hasCanonicalPalaceSequence =>
-      _versionAtLeast(rulePackage.version, 1, 1, 0);
+      _versionAtLeast(rulePackage.version, 1, 1, 0) ||
+      chart.base.palaceSequence > 0;
 
   /// 以手动四柱覆盖显示值，返回新 [CastPreview]。
   ///
@@ -1120,6 +1123,9 @@ class BaseHexagram {
     required this.shiPosition,
     required this.yingPosition,
     required this.movingPositions,
+    this.liuChong = false,
+    this.liuHe = false,
+    this.hexagramProperty,
     required this.hiddenHexagram,
     required this.lines,
   });
@@ -1143,6 +1149,9 @@ class BaseHexagram {
       movingPositions: (json['moving_positions'] as List<dynamic>)
           .map((item) => item as int)
           .toList(growable: false),
+      liuChong: json['liu_chong'] as bool? ?? false,
+      liuHe: json['liu_he'] as bool? ?? false,
+      hexagramProperty: json['hexagram_property'] as String?,
       hiddenHexagram: json['hidden_hexagram'] == null
           ? null
           : HiddenHexagram.fromJson(
@@ -1165,6 +1174,9 @@ class BaseHexagram {
   final int shiPosition;
   final int yingPosition;
   final List<int> movingPositions;
+  final bool liuChong;
+  final bool liuHe;
+  final String? hexagramProperty;
   final HiddenHexagram? hiddenHexagram;
   final List<BaseChartLine> lines;
 }
@@ -1218,6 +1230,9 @@ class ChangedHexagram {
     required this.hexagramKind,
     required this.shiPosition,
     required this.yingPosition,
+    this.liuChong = false,
+    this.liuHe = false,
+    this.hexagramProperty,
     required this.relativeBasis,
     required this.relativeBasisElement,
     required this.lines,
@@ -1241,6 +1256,9 @@ class ChangedHexagram {
       yingPosition: json['ying_position'] as int? ?? 0,
       relativeBasis: json['relative_basis'] as String,
       relativeBasisElement: json['relative_basis_element'] as String,
+      liuChong: json['liu_chong'] as bool? ?? false,
+      liuHe: json['liu_he'] as bool? ?? false,
+      hexagramProperty: json['hexagram_property'] as String?,
       lines: (json['lines'] as List<dynamic>)
           .map(
             (item) => ChangedChartLine.fromJson(item as Map<String, dynamic>),
@@ -1259,6 +1277,9 @@ class ChangedHexagram {
   final String hexagramKind;
   final int shiPosition;
   final int yingPosition;
+  final bool liuChong;
+  final bool liuHe;
+  final String? hexagramProperty;
   final String relativeBasis;
   final String relativeBasisElement;
   final List<ChangedChartLine> lines;
@@ -1578,6 +1599,20 @@ BaseChartLine _legacyBaseLine(Map<String, dynamic> json) {
   );
 }
 
+/// 旧档案卦序补算：优先读存储的 `palace_sequence`；缺失或为 0 时，
+/// 从卦码按京房八宫寻世诀计算宫内卦序（1..8）。无法计算返回 0。
+int _legacyPalaceSequence(Map<String, dynamic> json) {
+  final stored = (json['palace_sequence'] as num?)?.toInt();
+  if (stored != null && stored > 0) return stored;
+  final code = json['code'] as String? ?? '';
+  if (code.length != 6) return 0;
+  try {
+    return engine.calculateShiYing(code).palaceSequence;
+  } catch (_) {
+    return 0;
+  }
+}
+
 ChangedHexagram _legacyChangedHexagram(
   Map<String, dynamic> json, {
   required String basePalaceName,
@@ -1598,7 +1633,7 @@ ChangedHexagram _legacyChangedHexagram(
       name: changedPalaceName,
       element: changedPalaceElement,
     ),
-    palaceSequence: (json['palace_sequence'] as num?)?.toInt() ?? 0,
+    palaceSequence: _legacyPalaceSequence(json),
     hexagramKind: json['hexagram_kind'] as String? ?? 'unrecorded',
     shiPosition: (json['shi_position'] as num?)?.toInt() ?? 0,
     yingPosition: (json['ying_position'] as num?)?.toInt() ?? 0,

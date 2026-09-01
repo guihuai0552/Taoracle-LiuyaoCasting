@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/design_system/tokens/ds_colors.dart';
 import '../../ui/liuyao_design.dart';
 import 'almanac_client.dart';
 import 'almanac_models.dart';
@@ -312,9 +313,9 @@ class _AlmanacPageState extends State<AlmanacPage> {
                 Text(
                   '万年历',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: _cinnabar,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 3,
+                    color: _mutedInk,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 2,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -334,7 +335,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
                           style: Theme.of(context).textTheme.headlineLarge
                               ?.copyWith(
                                 color: _ink,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                                 letterSpacing: -1,
                               ),
                         ),
@@ -468,7 +469,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
                         snapshot.lunar.fullLabel,
                         key: const Key('selected-lunar-date'),
                         style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -517,7 +518,10 @@ class _AlmanacPageState extends State<AlmanacPage> {
                   onSelected: _selectTwoHour,
                 ),
                 const SizedBox(height: 20),
-                _WealthGod(direction: snapshot.wealthGodDirection),
+                _WealthGod(
+                  direction: snapshot.wealthGodDirection,
+                  mansion: snapshot.twentyEightMansion,
+                ),
                 if (_dayError != null) ...[
                   const SizedBox(height: 14),
                   Text(
@@ -567,7 +571,7 @@ class _MonthArrow extends StatelessWidget {
       style: IconButton.styleFrom(
         backgroundColor: _cinnabar,
         foregroundColor: Colors.white,
-        disabledBackgroundColor: const Color(0x66B3261E),
+        disabledBackgroundColor: DSColors.celadonDim.withValues(alpha: .4),
       ),
       icon: Icon(icon, size: 18),
     );
@@ -615,12 +619,12 @@ class _CalendarDay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = selected
-        ? Colors.white
+        ? DSColors.moonWhite
         : !cell.available || !cell.inCurrentMonth
-        ? const Color(0x55251D18)
+        ? DSColors.textFaint
         : _ink;
     final secondary = selected
-        ? const Color(0xE6FFFFFF)
+        ? DSColors.moonWhite
         : cell.solarTerm != null
         ? _cinnabar
         : _mutedInk;
@@ -641,7 +645,7 @@ class _CalendarDay extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 1),
           decoration: BoxDecoration(
             color: selected ? _cinnabar : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: today
                   ? selected
@@ -662,7 +666,7 @@ class _CalendarDay extends StatelessWidget {
                     color: foreground,
                     fontSize: 18,
                     height: 1.1,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -708,13 +712,13 @@ class _SectionLabel extends StatelessWidget {
           style: const TextStyle(
             color: _cinnabar,
             fontSize: 12,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -754,7 +758,7 @@ class _PillarGrid extends StatelessWidget {
                       style: const TextStyle(
                         color: _ink,
                         fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -795,9 +799,10 @@ class _TwoHourStrip extends StatelessWidget {
         itemBuilder: (context, index) {
           final pillar = pillars[index];
           final selected = pillar.index == selectedIndex;
+          // index 语义与 cnlunar 一致：0 = 0 点子正，12 = 23 点子初。
           final branch = switch (pillar.index) {
-            0 => '子初',
-            12 => '子正',
+            0 => '子正',
+            12 => '子初',
             _ => pillar.branch,
           };
           return InkWell(
@@ -809,8 +814,14 @@ class _TwoHourStrip extends StatelessWidget {
               width: 52,
               padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: selected ? _ink : const Color(0xFFF3ECE2),
-                borderRadius: BorderRadius.circular(12),
+                // 线框图：选中时辰为「红框圈出」——淡朱红底 + 1.2px 红描边 + 红字。
+                color: selected
+                    ? DSColors.glowCinnabar
+                    : DSColors.surfaceLightSunken,
+                borderRadius: BorderRadius.circular(10),
+                border: selected
+                    ? Border.all(color: _cinnabar, width: 1.2)
+                    : Border.all(color: Colors.transparent),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -818,16 +829,21 @@ class _TwoHourStrip extends StatelessWidget {
                   Text(
                     branch,
                     style: TextStyle(
-                      color: selected ? Colors.white : _mutedInk,
+                      color: selected ? _cinnabar : _mutedInk,
                       fontSize: 11,
+                      fontWeight: selected
+                          ? FontWeight.w700
+                          : FontWeight.w400,
                     ),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     pillar.ganzhi,
                     style: TextStyle(
-                      color: selected ? Colors.white : _ink,
-                      fontWeight: FontWeight.w800,
+                      color: selected ? _cinnabar : _ink,
+                      fontWeight: selected
+                          ? FontWeight.w700
+                          : FontWeight.w600,
                     ),
                   ),
                 ],
@@ -841,9 +857,12 @@ class _TwoHourStrip extends StatelessWidget {
 }
 
 class _WealthGod extends StatelessWidget {
-  const _WealthGod({required this.direction});
+  const _WealthGod({required this.direction, this.mansion});
 
   final String direction;
+
+  /// 当值二十八宿（如「室宿」）；为空时保持原单栏财神样式。
+  final String? mansion;
 
   @override
   Widget build(BuildContext context) {
@@ -851,8 +870,9 @@ class _WealthGod extends StatelessWidget {
       key: const Key('wealth-god-card'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7E9DF),
-        borderRadius: BorderRadius.circular(16),
+        color: DSColors.glassWeak,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: DSColors.hairline, width: 1),
       ),
       child: Row(
         children: [
@@ -876,9 +896,36 @@ class _WealthGod extends StatelessWidget {
             style: const TextStyle(
               color: _ink,
               fontSize: 20,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
+          if (mansion != null) ...[
+            Container(
+              width: 1,
+              height: 34,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              color: DSColors.hairline,
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '当值星宿',
+                  style: TextStyle(color: _cinnabar, fontSize: 12),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  mansion!,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/design_system/tokens/ds_colors.dart';
 import '../../ui/liuyao_design.dart';
 import '../archive/archive_client.dart';
 import '../archive/case_detail_page.dart';
+import '../settings/app_preferences.dart';
 import 'casting_client.dart';
 
 const _ink = LiuyaoColors.ink;
@@ -13,10 +15,12 @@ const _rule = LiuyaoColors.inkFaint;
 
 /// 时刻起卦法（时间起卦）页面。
 ///
-/// 引擎 `time_pillar.shichen_ke_houtian.v1`（附件《时刻起卦法详解(1)》）：
-/// 一时辰 120 分钟均分 12 刻，每刻十分钟；五鼠遁推时柱/刻柱天干；
-/// 时支后天八卦为内卦、刻支后天八卦为外卦；动爻取（时干序+刻干序）mod 6，
-/// 余 0 则上爻动。本页只提供占问与时刻输入，计算与存档交由
+/// 引擎 `time_pillar.ke_gan_najia.v2`（时刻起卦法 2.0，用户 2026-09-01 确认）：
+/// 念头起时锁定时刻干支；一时辰 120 分钟均分 12 刻，每刻十分钟，
+/// 时上起刻法推刻柱；刻干纳甲翻卦为内卦（甲壬乾乙癸坤丙艮丁兑戊坎己离庚震辛巽）、
+/// 刻支后天方位翻卦为外卦；动爻取（日干序+时干序）mod 6，余 0 则上爻动。
+/// 1.0 内卦取时支，人类活动集中于 7-23 点导致内卦分布偏斜，2.0 予以修正。
+/// 本页只提供占问与时刻输入，计算与存档交由
 /// [CastingDataSource.previewTimePillar] 与 [ArchiveDataSource.saveCast]。
 class TimePillarCastingPage extends StatefulWidget {
   const TimePillarCastingPage({
@@ -112,15 +116,13 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
   }
 
   Future<void> _reviewAndSubmit() async {
-    final question = _questionController.text.trim();
-    if (question.isEmpty) {
-      setState(() => _error = '请先填写占问事项');
-      return;
-    }
-    if (question.length > 1000) {
+    // 问念可空（2026-09-01 需求）：留空时默认「暂无问念」。
+    final rawQuestion = _questionController.text.trim();
+    if (rawQuestion.length > 1000) {
       setState(() => _error = '占问事项不能超过 1000 字');
       return;
     }
+    final question = rawQuestion.isEmpty ? '暂无问念' : rawQuestion;
     FocusScope.of(context).unfocus();
     setState(() => _error = null);
     final confirmed = await showModalBottomSheet<bool>(
@@ -144,6 +146,8 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
       final preview = await _dataSource.previewTimePillar(
         question: question,
         dateTime: _dateTime,
+        dayBoundary: currentPreferences.dayBoundaryStrategy,
+        monthBoundary: currentPreferences.monthBoundaryStrategy,
       );
       final detail = await _archiveClient.saveCast(
         question: question,
@@ -176,8 +180,6 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
           key: const Key('time-pillar-casting-scroll'),
           padding: const EdgeInsets.fromLTRB(14, 20, 14, 28),
           children: [
-            _buildHeader(),
-            const SizedBox(height: 18),
             _buildQuestion(),
             const SizedBox(height: 12),
             _buildDateTime(),
@@ -195,59 +197,6 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '六爻',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: _cinnabar,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 3,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '时刻起卦',
-                key: const Key('time-pillar-casting-title'),
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  color: _ink,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '一时辰十二刻·每刻十分钟，按时辰与刻柱起卦',
-                style: TextStyle(color: _mutedInk),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _ink,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: const Text(
-            '时刻模式',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildQuestion() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -260,7 +209,7 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
         maxLength: 1000,
         decoration: const InputDecoration(
           labelText: '占问事项',
-          hintText: '写清楚对象、背景和想确认的问题',
+          hintText: '可不填，留空记为「暂无问念」；写清楚对象与背景更好',
           border: InputBorder.none,
           counterText: '',
         ),
@@ -315,26 +264,26 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
               const SizedBox(width: 8),
               const Text(
                 '取数规则',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               Text(
-                '时支 · 刻支 · 天干序数',
+                '刻干 · 刻支 · 日时干序',
                 style: TextStyle(color: _mutedInk, fontSize: 9),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Text(
-            '内卦 = 时支后天八卦（下卦）\n'
-            '外卦 = 刻支后天八卦（上卦）\n'
-            '动爻 =（时干序数 + 刻干序数）mod 6，余 0 取上爻',
+            '内卦 = 刻干纳甲翻卦（甲壬乾 乙癸坤 丙艮 丁兑 戊坎 己离 庚震 辛巽）\n'
+            '外卦 = 刻支后天方位翻卦（子坎 丑寅艮 卯震 辰巳巽 午离 未申坤 酉兑 戌亥乾）\n'
+            '动爻 =（日干序数 + 时干序数）mod 6，余 0 取上爻',
             style: const TextStyle(color: _mutedInk, fontSize: 11, height: 1.7),
           ),
           const SizedBox(height: 6),
           Text(
-            '一时辰 120 分钟均分 12 刻，每刻十分钟；\n'
-            '时辰内 0-9 分为子刻、10-19 为丑刻，依此类推。',
+            '念头起时锁定时刻干支；一时辰 120 分钟均分 12 刻，每刻十分钟，\n'
+            '时上起刻法推刻柱（时辰内 0-9 分为子刻、10-19 为丑刻，依此类推）。',
             style: const TextStyle(color: _mutedInk, fontSize: 10, height: 1.6),
           ),
         ],
@@ -350,7 +299,7 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
             key: const Key('reset-time-pillar'),
             onPressed: _submitting ? null : _resetDateTime,
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(54),
+              minimumSize: const Size.fromHeight(44),
               side: const BorderSide(color: _cinnabar),
               foregroundColor: _ink,
             ),
@@ -363,8 +312,8 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
             key: const Key('review-time-pillar-cast'),
             onPressed: _submitting ? null : _reviewAndSubmit,
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(54),
-              backgroundColor: _cinnabar,
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: LiuyaoColors.cinnabar,
             ),
             child: _submitting
                 ? const SizedBox.square(
@@ -470,9 +419,12 @@ class _InlineError extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8E8DF),
+        // v1.0：警示卡走暗红族（glowWarning），不再借用动爻信号色。
+        color: DSColors.glowWarning,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0x55B3261E)),
+        border: Border.all(
+          color: DSColors.signalPlum.withValues(alpha: .33),
+        ),
       ),
       child: Row(
         children: [
@@ -511,7 +463,7 @@ class _TimePillarConfirmation extends StatelessWidget {
         children: [
           const Text(
             '确认起卦',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
           _ConfirmationRow(label: '占问事项', value: question),
@@ -524,8 +476,8 @@ class _TimePillarConfirmation extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            '将按「时刻起卦法」取数成卦：一时辰十二刻、每刻十分钟，'
-            '按时辰与刻柱推定本卦与动爻，并保存为档案。',
+            '将按「时刻起卦法 2.0」取数成卦：念头起时锁定时刻干支，'
+            '以刻干纳甲为内卦、刻支方位为外卦，日干与时干序数定动爻，并保存为档案。',
             style: TextStyle(color: _mutedInk, fontSize: 11),
           ),
           const SizedBox(height: 18),
@@ -535,7 +487,7 @@ class _TimePillarConfirmation extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(context, false),
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
+                    minimumSize: const Size.fromHeight(44),
                     side: const BorderSide(color: _cinnabar),
                   ),
                   child: const Text('取消'),
@@ -546,8 +498,8 @@ class _TimePillarConfirmation extends StatelessWidget {
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context, true),
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    backgroundColor: _cinnabar,
+                    minimumSize: const Size.fromHeight(44),
+                    backgroundColor: LiuyaoColors.cinnabar,
                   ),
                   child: const Text('确认排盘'),
                 ),

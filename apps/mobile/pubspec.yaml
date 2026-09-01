@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.7.1+10
+version: 1.16.0+28
 
 environment:
   sdk: ^3.12.0
@@ -42,6 +42,9 @@ dependencies:
   path_provider: ^2.1.6
   share_plus: ^13.3.0
   intl: any
+  # v1.0 图标系统：SVG 细线图标渲染（Quiet Intelligence · design-system-v1.0.md §8）。
+  flutter_svg: ^2.3.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -65,10 +68,17 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # v1.0 细线图标集（24px · stroke 1.5 · 圆角 2 · design-system-v1.0.md §8）。
+  assets:
+    - assets/icons/
+
+  # 道谕宋（京华老宋体 OFL 子集，约 6MB）：仅用于卦面长图导出，UI 不使用。
+  # 来源与授权见同目录 OFL-KingHwa-OldSong.txt。
+  fonts:
+    - family: DaoyuSong
+      fonts:
+        - asset: assets/fonts/DaoyuSong-Regular.ttf
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -1,0 +1,11 @@
+DaoyuSong-Regular.ttf
+=====================
+
+来源：京華老宋體 KingHwa OldSong 1.0（https://github.com/ButCornB/KingHwa-OldSongfont）
+授权：SIL Open Font License 1.1（https://openfontlicense.org/）
+
+本文件为按需子集化版本：保留 GB2312 全部汉字与常用符号共约 7555 字，
+用于「道谕六爻」卦面长图导出排版。原始字体及完整授权文本见上述项目。
+
+子集化时保留原始版权 name 记录；按 OFL 1.1 规定，再分发时不得单独出售
+字体文件本身，且衍生字体不得使用 Reserved Font Name。

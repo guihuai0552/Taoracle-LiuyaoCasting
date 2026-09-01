@@ -1,22 +1,82 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import 'design_system/app_theme_v1.dart';
+import 'design_system/tokens/ds_colors.dart';
+import 'design_system/tokens/ds_colors_v1.dart';
+
+/// 语义别名层：历史令牌映射到「道谕六爻」浅色朱红体系。
+///
+/// 迁移策略：不改既有 `LiuyaoColors.xxx` 引用，只在此处换语义值，
+/// 全部页面一次性切换。命名保持旧称以避免大面积机械改动。
+/// 当前取值经 [DSColors] 门面指向浅色朱红 token
+/// （暖白底 × 纯白卡片 × 朱红主强调 × 棕金辅助），与生产主题一致。
 abstract final class LiuyaoColors {
-  static const paper = Color(0xFFF5F0E6);
-  static const paperRaised = Color(0xFFF8F4E8);
-  static const parchment = Color(0xFFF2E8D5);
-  static const ink = Color(0xFF1C1C1C);
-  static const inkMedium = Color(0xFF3A3A3A);
-  static const inkMuted = Color(0xFF5C5C5C);
-  static const inkFaint = Color(0xFFD0D0D0);
-  static const cinnabar = Color(0xFFB22222);
-  static const jade = Color(0xFF3F6250);
+  /// 页面背景 → 宣纸米白。
+  static const paper = DSColors.background;
 
-  static const wood = Color(0xFF347445);
-  static const fire = Color(0xFFC23A32);
-  static const earth = Color(0xFF8B7668);
-  static const metal = Color(0xFFD49A26);
-  static const water = Color(0xFF216B9B);
+  /// 抬升表面（卡片底）。
+  static const paperRaised = DSColors.surfaceRaised;
+
+  /// 次级表面（图标底、分组底）。
+  static const parchment = DSColors.surface;
+
+  /// 主文本 / 主色 → 浓墨。
+  static const ink = DSColors.textPrimary;
+  static const inkMedium = DSColors.textSecondary;
+  static const inkMuted = DSColors.textMuted;
+
+  /// 弱化线 → 发丝线。
+  static const inkFaint = DSColors.hairlineStrong;
+
+  /// 朱砂（克制使用）。
+  static const cinnabar = DSColors.cinnabar;
+
+  /// 玉青。
+  static const jade = DSColors.jade;
+
+  static const wood = DSColors.wood;
+  static const fire = DSColors.fire;
+  static const earth = DSColors.earth;
+  static const metal = DSColors.metal;
+  static const water = DSColors.water;
+}
+
+/// 语义别名层（v1.0）：Quiet Intelligence 色板的旧称映射。
+///
+/// 供迁移期使用——旧 `LiuyaoColors.xxx` 引用可逐处切换到本层，
+/// 字段与 [LiuyaoColors] 一一对应，避免大面积机械改动。
+/// 注意：本层服务于**浅色模式**（米白底 × 深字），暗色场景请直接用
+/// [DSColorsV1] 的 night 系令牌。
+abstract final class LiuyaoColorsV1 {
+  /// 页面背景 → 米白。
+  static const paper = DSColorsV1.background;
+
+  /// 抬升表面（卡片底）→ 米白微亮层。
+  static const paperRaised = DSColorsV1.surfaceLight;
+
+  /// 次级表面（图标底、分组底、输入框底）→ 米白微暗层。
+  static const parchment = DSColorsV1.surfaceLightSunken;
+
+  /// 主文本 → 玄武岩黑。
+  static const ink = DSColorsV1.textPrimary;
+  static const inkMedium = DSColorsV1.textSecondary;
+  static const inkMuted = DSColorsV1.textMuted;
+
+  /// 弱化线 → 强发丝线。
+  static const inkFaint = DSColorsV1.hairlineStrong;
+
+  /// 警示（克制使用）→ 暗红。
+  static const cinnabar = DSColorsV1.warning;
+
+  /// 强调（仅关键信息）→ 蓝灰。
+  static const jade = DSColorsV1.accent;
+
+  // 五行（保留，不动）。
+  static const wood = DSColorsV1.wood;
+  static const fire = DSColorsV1.fire;
+  static const earth = DSColorsV1.earth;
+  static const metal = DSColorsV1.metal;
+  static const water = DSColorsV1.water;
 }
 
 abstract final class LiuyaoSpacing {
@@ -30,146 +90,16 @@ abstract final class LiuyaoSpacing {
 
 abstract final class LiuyaoRadii {
   static const small = 8.0;
-  static const card = 12.0;
+  static const card = 16.0;
   static const large = 18.0;
   static const phone = 24.0;
 }
 
 ThemeData buildLiuyaoTheme() {
-  const colors = ColorScheme.light(
-    primary: LiuyaoColors.cinnabar,
-    onPrimary: LiuyaoColors.paperRaised,
-    secondary: LiuyaoColors.ink,
-    onSecondary: LiuyaoColors.paperRaised,
-    surface: LiuyaoColors.paperRaised,
-    onSurface: LiuyaoColors.ink,
-    error: LiuyaoColors.cinnabar,
-    onError: LiuyaoColors.paperRaised,
-    outline: LiuyaoColors.inkFaint,
-    outlineVariant: Color(0x663A3A3A),
-  );
-  final base = ThemeData.light(useMaterial3: true);
-  final bodyTheme = base.textTheme.apply(
-    bodyColor: LiuyaoColors.inkMedium,
-    displayColor: LiuyaoColors.ink,
-    fontFamilyFallback: const [
-      'PingFang SC',
-      'Noto Sans CJK SC',
-      'Noto Sans SC',
-    ],
-  );
-  TextStyle serif(TextStyle? source) => (source ?? const TextStyle()).copyWith(
-    color: LiuyaoColors.ink,
-    fontFamily: 'Songti SC',
-    fontFamilyFallback: const ['Noto Serif CJK SC', 'Noto Serif SC', 'STSong'],
-  );
-
-  return base.copyWith(
-    colorScheme: colors,
-    scaffoldBackgroundColor: LiuyaoColors.paper,
-    canvasColor: LiuyaoColors.paper,
-    dividerColor: LiuyaoColors.inkFaint,
-    textTheme: bodyTheme.copyWith(
-      displayLarge: serif(bodyTheme.displayLarge),
-      displayMedium: serif(bodyTheme.displayMedium),
-      displaySmall: serif(bodyTheme.displaySmall),
-      headlineLarge: serif(bodyTheme.headlineLarge),
-      headlineMedium: serif(bodyTheme.headlineMedium),
-      headlineSmall: serif(bodyTheme.headlineSmall),
-      titleLarge: serif(bodyTheme.titleLarge),
-    ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent,
-      foregroundColor: LiuyaoColors.ink,
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      centerTitle: false,
-      titleTextStyle: TextStyle(
-        color: LiuyaoColors.ink,
-        fontFamily: 'Songti SC',
-        fontFamilyFallback: ['Noto Serif CJK SC', 'Noto Serif SC', 'STSong'],
-        fontSize: 20,
-        fontWeight: FontWeight.w800,
-      ),
-    ),
-    cardTheme: CardThemeData(
-      color: LiuyaoColors.paperRaised,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        side: const BorderSide(color: LiuyaoColors.inkFaint, width: .8),
-      ),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: LiuyaoColors.cinnabar,
-        foregroundColor: LiuyaoColors.paperRaised,
-        disabledBackgroundColor: LiuyaoColors.inkFaint,
-        minimumSize: const Size(48, 48),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-        ),
-        textStyle: const TextStyle(fontWeight: FontWeight.w800),
-      ),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: LiuyaoColors.ink,
-        minimumSize: const Size(48, 48),
-        side: const BorderSide(color: LiuyaoColors.ink, width: 1.1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-        ),
-        textStyle: const TextStyle(fontWeight: FontWeight.w800),
-      ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: LiuyaoColors.paperRaised,
-      hintStyle: const TextStyle(color: LiuyaoColors.inkMuted),
-      labelStyle: const TextStyle(color: LiuyaoColors.inkMuted),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        borderSide: const BorderSide(color: LiuyaoColors.inkFaint),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        borderSide: const BorderSide(color: LiuyaoColors.inkFaint),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        borderSide: const BorderSide(color: LiuyaoColors.cinnabar, width: 1.2),
-      ),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: LiuyaoColors.paperRaised.withValues(alpha: .96),
-      surfaceTintColor: Colors.transparent,
-      indicatorColor: LiuyaoColors.cinnabar.withValues(alpha: .10),
-      elevation: 0,
-      height: 70,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      iconTheme: WidgetStateProperty.resolveWith(
-        (states) => IconThemeData(
-          color: states.contains(WidgetState.selected)
-              ? LiuyaoColors.cinnabar
-              : LiuyaoColors.inkMuted,
-        ),
-      ),
-      labelTextStyle: WidgetStateProperty.resolveWith(
-        (states) => TextStyle(
-          color: states.contains(WidgetState.selected)
-              ? LiuyaoColors.cinnabar
-              : LiuyaoColors.inkMuted,
-          fontSize: 11,
-          fontWeight: states.contains(WidgetState.selected)
-              ? FontWeight.w800
-              : FontWeight.w600,
-        ),
-      ),
-    ),
-  );
+  // 全局切换为「道谕六爻」浅色朱红主题（依照线框图 wireframe-preview-approved.html 还原）。
+  // 暖白 #F3F2EF 底 × 纯白卡片 × 朱红 #A9282D 主强调 × 棕金 #AE8648 辅助。
+  // DSColors 门面已同步指向浅色朱红 token。
+  return buildDaoyuTheme();
 }
 
 class LiuyaoPaperBackground extends StatelessWidget {
@@ -178,10 +108,7 @@ class LiuyaoPaperBackground extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: LiuyaoColors.paper,
-    child: CustomPaint(painter: const ChineseLatticePainter(), child: child),
-  );
+  Widget build(BuildContext context) => DSDaoyuBackground(child: child);
 }
 
 class ChineseLatticePainter extends CustomPainter {
@@ -288,12 +215,13 @@ class LiuyaoSealMark extends StatelessWidget {
         children: [
           Text(
             character,
+            // 印章字：道谕宋为随包字体，iOS / Android 渲染一致。
             style: const TextStyle(
               color: LiuyaoColors.cinnabar,
-              fontFamily: 'Songti SC',
-              fontFamilyFallback: ['Noto Serif CJK SC', 'STSong'],
+              fontFamily: 'DaoyuSong',
+              fontFamilyFallback: ['Songti SC', 'Noto Serif CJK SC'],
               fontSize: 24,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               height: 1,
             ),
           ),

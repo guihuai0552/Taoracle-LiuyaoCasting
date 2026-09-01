@@ -8,6 +8,10 @@ import 'package:share_plus/share_plus.dart';
 import 'archive_client.dart';
 import 'archive_models.dart';
 import 'case_detail_page.dart';
+import '../settings/app_preferences.dart';
+import '../../ui/design_system/components/daoyu_brand_title.dart';
+import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_typography.dart';
 import '../../ui/liuyao_design.dart';
 
 const _ink = LiuyaoColors.ink;
@@ -36,6 +40,7 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
   String? _error;
   final Set<String> _activeTags = <String>{};
   List<String> _allTags = const [];
+  Map<String, int> _tagCounts = const {};
 
   @override
   void initState() {
@@ -64,16 +69,22 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
         tags: _activeTags.toList(),
       );
       final allTags = <String>{};
+      final tagCounts = <String, int>{};
       for (final item in all) {
         allTags.addAll(item.tags);
+        for (final tag in item.tags) {
+          tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+        }
       }
+      // 自定义标签（档案页「＋」新建）与档案标签合并，未挂载也参与筛选。
+      allTags.addAll(currentPreferences.customTags);
       final total = all.length;
       if (mounted) {
         setState(() {
           _cases = cases;
           _totalCount = total;
-          _allTags = allTags.toList()
-            ..sort((a, b) => a.compareTo(b));
+          _allTags = allTags.toList()..sort((a, b) => a.compareTo(b));
+          _tagCounts = tagCounts;
         });
       }
     } on Object catch (error) {
@@ -107,6 +118,62 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
   void _selectTag(String tag) {
     setState(() => _activeTags.add(tag));
     _load();
+  }
+
+  /// 列表长按删除：二次确认后从本机档案移除（2026-09-01 需求）。
+  /// 删除二次确认框（长按与滑动共用）：返回用户是否确认删除。
+  Future<bool> _confirmDeleteDialog(CaseSummary summary) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除这份档案？'),
+        content: Text(
+          '「${summary.question}」及其卦面、解读与反馈将被永久删除，且无法恢复。',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('archive-delete-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('再想想'),
+          ),
+          FilledButton(
+            key: const Key('archive-delete-confirm'),
+            style: FilledButton.styleFrom(
+              backgroundColor: LiuyaoColors.cinnabar,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  Future<void> _confirmDelete(CaseSummary summary) async {
+    if (!await _confirmDeleteDialog(summary)) return;
+    await _deleteCase(summary);
+  }
+
+  /// 执行删除并刷新；失败时回拉列表（滑动入口的卡片已被移除，需要恢复）。
+  Future<void> _deleteCase(CaseSummary summary) async {
+    try {
+      await _client.deleteCase(summary.id);
+    } on Object catch (error) {
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message(error))));
+      }
+      return;
+    }
+    await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('档案已删除')));
+    }
   }
 
   Future<void> _showTransfer() async {
@@ -292,11 +359,43 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
                   sliver: SliverList.separated(
                     itemCount: _cases.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) => _CaseCard(
-                      item: _cases[index],
-                      onTap: () => _open(_cases[index]),
-                      onTagSelected: _selectTag,
-                    ),
+                    // 2026-09-01 需求：卡片支持滑动呼出删除（挂历式），
+                    // confirmDismiss 内做二次确认；左右滑均可触发。
+                    itemBuilder: (context, index) {
+                      final summary = _cases[index];
+                      return Dismissible(
+                        key: Key('archive-swipe-${summary.id}'),
+                        direction: DismissDirection.horizontal,
+                        // 卡片已整体滑出屏，收拢动画交给下方同步 setState 移除；
+                        // 保留默认 resize 动画会让已完成的 resize widget 在
+                        // 列表刷新时被再 build 一次，触发树内残留断言。
+                        resizeDuration: null,
+                        background: _swipeDeleteBackground(
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.only(left: 24),
+                        ),
+                        secondaryBackground: _swipeDeleteBackground(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 24),
+                        ),
+                        confirmDismiss: (_) => _confirmDeleteDialog(summary),
+                        onDismissed: (_) {
+                          // 同步先移除，避免被滑走的 Dismissible 仍留在树里。
+                          setState(
+                            () => _cases.removeWhere(
+                              (item) => item.id == summary.id,
+                            ),
+                          );
+                          _deleteCase(summary);
+                        },
+                        child: _CaseCard(
+                          item: summary,
+                          onTap: () => _open(summary),
+                          onLongPress: () => _confirmDelete(summary),
+                          onTagSelected: _selectTag,
+                        ),
+                      );
+                    },
                   ),
                 ),
             ],
@@ -317,21 +416,14 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
               const Text(
                 '案例库',
                 style: TextStyle(
-                  color: _cinnabar,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 3,
+                  color: _mutedInk,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 2,
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                '六爻档案',
-                key: const Key('archive-title'),
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  color: _ink,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1,
-                ),
-              ),
+              // 「道谕六爻」品牌标题统一组件（本页为样式基准）。
+              const DaoyuBrandTitle(keyOverride: Key('archive-title')),
               const SizedBox(height: 6),
               const Text(
                 '本机持久保存 · 退出后台或重启后仍会保留',
@@ -404,33 +496,61 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
       height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: _allTags.length + (_activeTags.isNotEmpty ? 1 : 0),
+        itemCount: _allTags.length +
+            (_activeTags.isNotEmpty ? 1 : 0) +
+            1, // 尾部固定「＋」新增标签入口。
         separatorBuilder: (_, _) => const SizedBox(width: 6),
         itemBuilder: (context, index) {
+          final hasClear = _activeTags.isNotEmpty;
           // 首位为「清除筛选」入口（有活动筛选时）。
-          if (_activeTags.isNotEmpty) {
-            if (index == 0) {
-              return FilterChip(
-                key: const Key('tag-filter-clear'),
-                label: const Text('清除筛选'),
-                selected: false,
-                onSelected: (_) {
-                  setState(_activeTags.clear);
-                  _load();
-                },
-                backgroundColor: _paper,
-                selectedColor: _paper,
-                side: const BorderSide(color: _rule),
-              );
-            }
-            final tag = _allTags[index - 1];
-            return _tagChip(tag);
+          if (hasClear && index == 0) {
+            return FilterChip(
+              key: const Key('tag-filter-clear'),
+              label: const Text('清除筛选'),
+              selected: false,
+              onSelected: (_) {
+                setState(_activeTags.clear);
+                _load();
+              },
+              backgroundColor: _paper,
+              selectedColor: _paper,
+              side: const BorderSide(color: _rule),
+            );
           }
-          final tag = _allTags[index];
-          return _tagChip(tag);
+          final tagIndex = index - (hasClear ? 1 : 0);
+          if (tagIndex < _allTags.length) {
+            return _tagChip(_allTags[tagIndex]);
+          }
+          return ActionChip(
+            key: const Key('tag-filter-add'),
+            label: const Text('＋ 标签'),
+            onPressed: _manageTags,
+            backgroundColor: _paper,
+            side: const BorderSide(color: _rule),
+            labelStyle: const TextStyle(
+              color: _cinnabar,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          );
         },
       ),
     );
+  }
+
+  /// 档案页「＋」：新建自定义标签（持久化），供筛选与各档案快速选用。
+  Future<void> _manageTags() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: _paper,
+      isScrollControlled: true,
+      builder: (context) => _TagManagerSheet(
+        allTags: _allTags,
+        caseCountByTag: _tagCounts,
+      ),
+    );
+    if (mounted) _load();
   }
 
   Widget _tagChip(String tag) {
@@ -457,9 +577,7 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
         fontSize: 12,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
       ),
-      side: BorderSide(
-        color: selected ? _cinnabar : _rule,
-      ),
+      side: BorderSide(color: selected ? _cinnabar : _rule),
     );
   }
 
@@ -482,7 +600,7 @@ class _TransferSheet extends StatelessWidget {
         children: [
           const Text(
             '档案迁移',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           Text(
@@ -558,7 +676,7 @@ class _TransferChoice extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -613,7 +731,7 @@ class _ImportReviewSheet extends StatelessWidget {
         children: [
           const Text(
             '检查迁移文件',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 5),
           Text(
@@ -688,10 +806,40 @@ class _ImportMetric extends StatelessWidget {
           style: const TextStyle(
             color: _ink,
             fontSize: 21,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         Text(label, style: const TextStyle(color: _mutedInk, fontSize: 11)),
+      ],
+    ),
+  );
+}
+
+/// 滑动删除背景（挂历式）：朱砂底 + 删除图标与文字，圆角与卡片一致。
+Widget _swipeDeleteBackground({
+  required Alignment alignment,
+  required EdgeInsets padding,
+}) {
+  return Container(
+    decoration: BoxDecoration(
+      color: LiuyaoColors.cinnabar.withValues(alpha: .92),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    alignment: alignment,
+    padding: padding,
+    child: const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.delete_outline, color: Colors.white, size: 22),
+        SizedBox(width: 6),
+        Text(
+          '删除',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     ),
   );
@@ -702,36 +850,52 @@ class _CaseCard extends StatelessWidget {
     required this.item,
     required this.onTap,
     required this.onTagSelected,
+    this.onLongPress,
   });
 
   final CaseSummary item;
   final VoidCallback onTap;
   final ValueChanged<String> onTagSelected;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final transition = item.changedHexagram == null
         ? '${item.baseHexagram} · 静卦'
-        : '${item.baseHexagram} → ${item.changedHexagram}';
+        : '${item.baseHexagram} 之 ${item.changedHexagram}';
     return Material(
       color: _paper,
       borderRadius: BorderRadius.circular(LiuyaoRadii.card),
       child: InkWell(
         key: Key('archive-case-${item.id}'),
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(LiuyaoRadii.card),
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-            border: Border.all(color: _rule, width: .8),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: DSColors.hairline, width: 1),
           ),
           child: Row(
             children: [
-              LiuyaoSealMark(
+              SizedBox(
                 key: Key('archive-seal-${item.id}'),
-                character: '卦',
-                label: '卦例',
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: Text(
+                    '卦',
+                    // 印章字：用打包的道谕宋（双端一致），不再依赖
+                    // Android 上落空的系统衬线链。
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: DSColors.cinnabar,
+                      fontFamily: 'DaoyuSong',
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -747,48 +911,42 @@ class _CaseCard extends StatelessWidget {
                         color: _ink,
                         fontSize: 15,
                         height: 1.25,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const Divider(height: 12, thickness: .8),
                     SizedBox(
-                      height: 34,
+                      height: 22,
                       child: Row(
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              _dateTime(item.castAt),
-                              key: Key('archive-time-${item.id}'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _mutedInk,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
+                          Text(
+                            _dateTime(item.castAt),
+                            key: Key('archive-time-${item.id}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: DSTypography.body(
+                              fontSize: 11,
+                              weight: FontWeight.w400,
+                              color: DSColors.textMuted,
                             ),
                           ),
-                          Container(width: .8, height: 18, color: _rule),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Expanded(
-                            flex: 2,
                             child: Text(
                               transition,
                               key: Key('archive-transition-${item.id}'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _cinnabar,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
+                              style: DSTypography.body(
+                                fontSize: 11,
+                                weight: FontWeight.w400,
+                                color: DSColors.textMuted,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
+                    const Divider(height: 14, thickness: .8),
                     if (item.tags.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       SizedBox(
@@ -796,8 +954,7 @@ class _CaseCard extends StatelessWidget {
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: item.tags.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(width: 4),
+                          separatorBuilder: (_, _) => const SizedBox(width: 4),
                           itemBuilder: (context, index) {
                             final tag = item.tags[index];
                             return InkWell(
@@ -810,18 +967,18 @@ class _CaseCard extends StatelessWidget {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _cinnabar.withValues(alpha: .08),
+                                  color: DSColors.paper,
                                   borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: _cinnabar.withValues(alpha: .3),
+                                    color: DSColors.amber.withValues(alpha: .55),
                                   ),
                                 ),
                                 child: Text(
                                   tag,
                                   style: const TextStyle(
-                                    color: _cinnabar,
+                                    color: Color(0xFF5A5145),
                                     fontSize: 10,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
@@ -867,7 +1024,7 @@ class _EmptyArchive extends StatelessWidget {
             ),
             child: const Icon(
               Icons.inventory_2_outlined,
-              color: Colors.white,
+              color: LiuyaoColors.paper,
               size: 34,
             ),
           ),
@@ -876,7 +1033,7 @@ class _EmptyArchive extends StatelessWidget {
             error == null ? '还没有保存的卦例' : '暂时无法读取档案',
             style: Theme.of(
               context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text(
@@ -907,9 +1064,200 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFEDEA),
+      color: DSColors.glowCinnabar,
       borderRadius: BorderRadius.circular(14),
     ),
     child: Text(message, style: const TextStyle(color: _cinnabar)),
   );
+}
+
+/// 标签管理底部弹窗：新建自定义标签（持久化到偏好）、查看使用数量、
+/// 删除未挂载的自定义标签；已挂档案的标签随档案数据存在，不在此删除。
+class _TagManagerSheet extends StatefulWidget {
+  const _TagManagerSheet({
+    required this.allTags,
+    required this.caseCountByTag,
+  });
+
+  final List<String> allTags;
+  final Map<String, int> caseCountByTag;
+
+  @override
+  State<_TagManagerSheet> createState() => _TagManagerSheetState();
+}
+
+class _TagManagerSheetState extends State<_TagManagerSheet> {
+  final _controller = TextEditingController();
+  String? _error;
+  late List<String> _customTags = List.from(currentPreferences.customTags);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _persist(List<String> tags) async {
+    setState(() => _customTags = tags);
+    await savePreferences(currentPreferences.copyWith(customTags: tags));
+  }
+
+  Future<void> _add() async {
+    final tag = _controller.text.trim();
+    if (tag.isEmpty) {
+      setState(() => _error = '请输入标签文字');
+      return;
+    }
+    if (tag.length > 20) {
+      setState(() => _error = '标签最多 20 字');
+      return;
+    }
+    if (widget.allTags.contains(tag) || _customTags.contains(tag)) {
+      setState(() => _error = '标签「$tag」已存在');
+      return;
+    }
+    if (_customTags.length + widget.allTags.length >= 60) {
+      setState(() => _error = '标签总数最多 60 个');
+      return;
+    }
+    await _persist([..._customTags, tag]);
+    setState(() {
+      _error = null;
+      _controller.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final customSet = _customTags.toSet();
+    final archivedTags =
+        widget.allTags.where((tag) => !customSet.contains(tag)).toList();
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '标签分组',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '新建标签后会出现在筛选行；在卦面详情「编辑标签」中可快速选用。',
+            style: TextStyle(color: _mutedInk, fontSize: 12, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const Key('tag-new-input'),
+                  controller: _controller,
+                  maxLength: 20,
+                  onSubmitted: (_) => _add(),
+                  decoration: InputDecoration(
+                    hintText: '新标签名',
+                    counterText: '',
+                    isDense: true,
+                    filled: true,
+                    fillColor: _paper,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _rule),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _cinnabar),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                key: const Key('tag-new-add'),
+                onPressed: _add,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _cinnabar,
+                  minimumSize: const Size(72, 42),
+                ),
+                child: const Text('添加'),
+              ),
+            ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _error!,
+              style: const TextStyle(color: _cinnabar, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 14),
+          if (archivedTags.isNotEmpty) ...[
+            const Text(
+              '已有标签（来自档案）',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final tag in archivedTags)
+                  InputChip(
+                    key: Key('tag-manage-archived-$tag'),
+                    label: Text(
+                      '$tag · ${widget.caseCountByTag[tag] ?? 0}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    onPressed: null,
+                    backgroundColor: _paper,
+                    side: const BorderSide(color: _rule),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (_customTags.isNotEmpty) ...[
+            const Text(
+              '自定义标签',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final tag in _customTags)
+                  InputChip(
+                    key: Key('tag-manage-custom-$tag'),
+                    label: Text(tag, style: const TextStyle(fontSize: 12)),
+                    onDeleted: () => _persist(
+                      _customTags.where((item) => item != tag).toList(),
+                    ),
+                    deleteIconColor: _mutedInk,
+                    backgroundColor: _paper,
+                    side: const BorderSide(color: _rule),
+                  ),
+              ],
+            ),
+          ] else ...[
+            Text(
+              '还没有自定义标签；输入名称后点「添加」创建。',
+              style: TextStyle(color: _mutedInk, fontSize: 12, height: 1.4),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

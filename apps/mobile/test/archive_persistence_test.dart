@@ -54,6 +54,35 @@ void main() {
     expect(await File('${file.path}.tmp').exists(), isFalse);
   });
 
+  test('删除档案后立即落盘且重启后不复活', () async {
+    final client = ArchiveClient();
+    final keep = await client.saveCast(question: '保留案例', preview: makePreview());
+    final doomed = await client.saveCast(
+      question: '待删除案例',
+      preview: makePreview(),
+    );
+
+    await client.deleteCase(doomed.id);
+
+    // 立即落盘：磁盘内容已不含被删案例，保留案例仍在。
+    final file = File('${tempDir.path}/liuyao_archive.json');
+    final content = await file.readAsString();
+    expect(content, isNot(contains('待删除案例')));
+    expect(content, contains('保留案例'));
+
+    // 模拟重启：仅靠磁盘重建后，被删案例不复活。
+    await ArchiveClient.reloadFromDisk();
+    final remaining = await client.listCases();
+    expect(remaining.map((item) => item.id), contains(keep.id));
+    expect(remaining.map((item) => item.id), isNot(contains(doomed.id)));
+
+    // 删除不存在的案例应显式报错而非静默成功。
+    expect(
+      () => client.deleteCase(doomed.id),
+      throwsException,
+    );
+  });
+
   test('退出重开后数据保留（模拟重启）', () async {
     final client = ArchiveClient();
     final saved = await client.saveCast(
@@ -213,5 +242,71 @@ void main() {
     );
     final detail = await client.getCase(saved.id);
     expect(detail.analyses.map((item) => item.body), ['第一版']);
+  });
+
+  test('新档案背景问念默认为空且不与占问回填', () async {
+    final client = ArchiveClient();
+    final saved = await client.saveCast(
+      question: '问背景是否回填',
+      preview: makePreview(),
+    );
+    expect(saved.question, '问背景是否回填');
+    expect(saved.questionContext, '');
+  });
+
+  test('标签保存后退出重开仍然存在', () async {
+    final client = ArchiveClient();
+    final saved = await client.saveCast(
+      question: '标签持久化',
+      preview: makePreview(),
+    );
+    await client.updateTags(caseId: saved.id, tags: ['工作', '待复盘']);
+    await ArchiveClient.reloadFromDisk();
+
+    final detail = await ArchiveClient().getCase(saved.id);
+    expect(detail.tags, containsAll(['工作', '待复盘']));
+  });
+
+  test('标签筛选包含全部已选标签', () async {
+    final client = ArchiveClient();
+    final work = await client.saveCast(
+      question: '工作卦例',
+      preview: makePreview(),
+    );
+    final life = await client.saveCast(
+      question: '生活卦例',
+      preview: makePreview(),
+    );
+    await client.updateTags(caseId: work.id, tags: ['工作', '待复盘']);
+    await client.updateTags(caseId: life.id, tags: ['生活']);
+
+    final all = await client.listCases(tags: const ['工作']);
+    expect(all.map((item) => item.id), [work.id]);
+
+    final both = await client.listCases(tags: const ['工作', '待复盘']);
+    expect(both.map((item) => item.id), [work.id]);
+
+    final none = await client.listCases(tags: const ['不存在']);
+    expect(none, isEmpty);
+
+    final empty = await client.listCases();
+    expect(empty.length, 2);
+  });
+
+  test('旧档案迁移为标签补空数组', () async {
+    final client = ArchiveClient();
+    final saved = await client.saveCast(
+      question: '旧档案',
+      preview: makePreview(),
+    );
+    final file = File('${tempDir.path}/liuyao_archive.json');
+    final root = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    final cases = (root['cases'] as Map).cast<String, dynamic>();
+    (cases[saved.id] as Map<String, dynamic>).remove('tags');
+    await file.writeAsString(jsonEncode(root), flush: true);
+
+    await ArchiveClient.reloadFromDisk();
+    final detail = await ArchiveClient().getCase(saved.id);
+    expect(detail.tags, isEmpty);
   });
 }

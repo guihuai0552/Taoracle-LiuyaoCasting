@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:liuyao_engine/liuyao_engine.dart' as engine;
 
+import '../../ui/design_system/components/ds_segmented_control.dart';
+import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_typography.dart';
 import '../../ui/liuyao_design.dart';
 import 'casting_models.dart';
 
 const _ink = LiuyaoColors.ink;
 const _mutedInk = LiuyaoColors.inkMuted;
-const _cinnabar = LiuyaoColors.cinnabar;
-const _paper = LiuyaoColors.paperRaised;
+
+/// v1.1 信号配给制：动爻 / 世应标记统一朱红（线框图主强调）。
+const _cinnabar = DSColors.celadon;
 const _softPaper = LiuyaoColors.parchment;
 const _rule = LiuyaoColors.inkFaint;
 const _mansionInk = LiuyaoColors.metal;
-const _mansionPaper = Color(0x24D49A26);
 
 class LiuyaoChartPreview extends StatefulWidget {
   const LiuyaoChartPreview({
@@ -33,11 +37,11 @@ class LiuyaoChartPreview extends StatefulWidget {
 class _LiuyaoChartPreviewState extends State<LiuyaoChartPreview> {
   String _growthReference = 'day';
   String _annotationMode = 'twelve_growth';
-  bool _showLineAnnotations = true;
   bool _showNaYin = true;
   bool _showTwelveGrowth = true;
   bool _showFiveStars = true;
   bool _show28Mansions = true;
+  bool _showAlmanacCalendar = false;
 
   @override
   Widget build(BuildContext context) {
@@ -55,25 +59,34 @@ class _LiuyaoChartPreviewState extends State<LiuyaoChartPreview> {
           annotationMode: _annotationMode,
           onGrowthTap: _openGrowthReferencePicker,
           visibility: LiuyaoLineAnnotationVisibility(
-            showNaYin: _showLineAnnotations && _showNaYin,
-            showTwelveGrowth: _showLineAnnotations && _showTwelveGrowth,
-            showFiveStars: _showLineAnnotations && _showFiveStars,
-            show28Mansions: _showLineAnnotations && _show28Mansions,
+            showNaYin: _showNaYin,
+            showTwelveGrowth: _showTwelveGrowth,
+            showFiveStars: _showFiveStars,
+            show28Mansions: _show28Mansions,
           ),
-        ),
-        const SizedBox(height: 12),
-        LiuyaoLineAnnotationsToggle(
-          showLineAnnotations: _showLineAnnotations,
-          onChangedLineAnnotations: (v) =>
-              setState(() => _showLineAnnotations = v),
-          showNaYin: _showNaYin,
-          onChangedNaYin: (v) => setState(() => _showNaYin = v),
-          showTwelveGrowth: _showTwelveGrowth,
-          onChangedTwelveGrowth: (v) => setState(() => _showTwelveGrowth = v),
-          showFiveStars: _showFiveStars,
-          onChangedFiveStars: (v) => setState(() => _showFiveStars = v),
-          show28Mansions: _show28Mansions,
-          onChanged28Mansions: (v) => setState(() => _show28Mansions = v),
+          footer: Column(
+            children: [
+              LiuyaoLineAnnotationsToggle(
+                showNaYin: _showNaYin,
+                onChangedNaYin: (v) => setState(() => _showNaYin = v),
+                showTwelveGrowth: _showTwelveGrowth,
+                onChangedTwelveGrowth: (v) =>
+                    setState(() => _showTwelveGrowth = v),
+                showFiveStars: _showFiveStars,
+                onChangedFiveStars: (v) => setState(() => _showFiveStars = v),
+                show28Mansions: _show28Mansions,
+                onChanged28Mansions: (v) => setState(() => _show28Mansions = v),
+                showAlmanacCalendar: _showAlmanacCalendar,
+                onToggleAlmanacCalendar: () => setState(
+                  () => _showAlmanacCalendar = !_showAlmanacCalendar,
+                ),
+              ),
+              if (_showAlmanacCalendar)
+                LiuyaoMiniAlmanacCalendar(
+                  initialMonth: preview.castAt,
+                ),
+            ],
+          ),
         ),
         if (preview.annotations.shenshaResults.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -107,8 +120,8 @@ class _LiuyaoChartPreviewState extends State<LiuyaoChartPreview> {
             key: const Key('save-cast-to-archive'),
             onPressed: archived || saving ? null : onSave,
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              backgroundColor: _cinnabar,
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: DSColors.celadon,
             ),
             icon: saving
                 ? const SizedBox.square(
@@ -179,7 +192,7 @@ class LiuyaoGrowthReferenceChoice {
   final String mode;
 }
 
-/// 卦面爻位标注参照选择底部弹窗：年柱/月柱/日柱/时柱/京房五星。
+/// 卦面爻位标注参照选择底部弹窗：年月日时柱 / 五行主体 / 京房五星。
 class LiuyaoGrowthReferenceSheet extends StatelessWidget {
   const LiuyaoGrowthReferenceSheet({
     super.key,
@@ -190,7 +203,7 @@ class LiuyaoGrowthReferenceSheet extends StatelessWidget {
   final String currentReference;
   final String currentMode;
 
-  static const _choices = [
+  static const _pillarChoices = [
     LiuyaoGrowthReferenceChoice(
       label: '年柱',
       reference: 'year',
@@ -211,12 +224,69 @@ class LiuyaoGrowthReferenceSheet extends StatelessWidget {
       reference: 'hour',
       mode: 'twelve_growth',
     ),
+  ];
+
+  /// 五行主体：以所选五行为主体观察各爻支（木在亥长生、在卯帝旺…）。
+  static const _elementChoices = [
     LiuyaoGrowthReferenceChoice(
-      label: '京房五星',
-      reference: 'five_stars',
-      mode: 'five_stars',
+      label: '木',
+      reference: 'element:木',
+      mode: 'twelve_growth',
+    ),
+    LiuyaoGrowthReferenceChoice(
+      label: '火',
+      reference: 'element:火',
+      mode: 'twelve_growth',
+    ),
+    LiuyaoGrowthReferenceChoice(
+      label: '土',
+      reference: 'element:土',
+      mode: 'twelve_growth',
+    ),
+    LiuyaoGrowthReferenceChoice(
+      label: '金',
+      reference: 'element:金',
+      mode: 'twelve_growth',
+    ),
+    LiuyaoGrowthReferenceChoice(
+      label: '水',
+      reference: 'element:水',
+      mode: 'twelve_growth',
     ),
   ];
+
+  static const _starChoice = LiuyaoGrowthReferenceChoice(
+    label: '京房五星',
+    reference: 'five_stars',
+    mode: 'five_stars',
+  );
+
+  Widget _choiceRow(
+    BuildContext context,
+    LiuyaoGrowthReferenceChoice choice,
+  ) {
+    final checked =
+        choice.mode == currentMode &&
+        (choice.mode == 'five_stars' ||
+            choice.reference == currentReference);
+    return ListTile(
+      key: Key('growth-choice-${choice.reference}'),
+      dense: true,
+      leading: Icon(
+        choice.mode == 'five_stars' ? Icons.star_outline : Icons.grain,
+        size: 18,
+        color: _cinnabar,
+      ),
+      title: Text(
+        choice.label,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+      ),
+      trailing: checked
+          ? const Icon(Icons.check, size: 18, color: _cinnabar)
+          : null,
+      onTap: () => Navigator.pop(context, choice),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -229,41 +299,35 @@ class LiuyaoGrowthReferenceSheet extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(20, 6, 20, 4),
             child: Text(
               '卦爻标注参照',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              '选择年柱/月柱/日柱/时柱切换十二长生计算依据；选择京房五星切换标注类型',
+              '年月日时柱以柱支为参照；五行以所选五行为主体观察各爻支；京房五星切换标注类型',
               style: TextStyle(color: _mutedInk, fontSize: 10, height: 1.4),
             ),
           ),
-          const SizedBox(height: 6),
-          for (final choice in _choices)
-            ListTile(
-              key: Key('growth-choice-${choice.reference}'),
-              dense: true,
-              leading: Icon(
-                choice.mode == 'five_stars' ? Icons.star_outline : Icons.grain,
-                size: 18,
-                color: _cinnabar,
-              ),
-              title: Text(
-                choice.label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              trailing:
-                  choice.mode == currentMode &&
-                      (choice.mode == 'five_stars' ||
-                          choice.reference == currentReference)
-                  ? const Icon(Icons.check, size: 18, color: _cinnabar)
-                  : null,
-              onTap: () => Navigator.pop(context, choice),
+          const SizedBox(height: 2),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 6, 20, 2),
+            child: Text(
+              '四柱参照',
+              style: TextStyle(color: _mutedInk, fontSize: 11),
             ),
+          ),
+          for (final choice in _pillarChoices) _choiceRow(context, choice),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 6, 20, 2),
+            child: Text(
+              '五行主体（木在亥长生、在卯帝旺…）',
+              style: TextStyle(color: _mutedInk, fontSize: 11),
+            ),
+          ),
+          for (final choice in _elementChoices) _choiceRow(context, choice),
+          const Divider(height: 1, indent: 20, endIndent: 20),
+          _choiceRow(context, _starChoice),
           const SizedBox(height: 8),
         ],
       ),
@@ -289,12 +353,12 @@ class LiuyaoLineAnnotationVisibility {
       showNaYin || showTwelveGrowth || showFiveStars || show28Mansions;
 }
 
-/// 卦面信息显示开关：总开关 + 纳音/十二长生/五星/二十八宿细分开关。
+/// 卦面信息显示开关：纳音/十二长生/五星/二十八宿四个统一规格小开关，
+/// 单行紧促排列，嵌在卦面卡片最底部一行（不再有独立大卡与总开关）。
+/// 尾部附带「万年历」入口，点击在下方展开内嵌月历。
 class LiuyaoLineAnnotationsToggle extends StatelessWidget {
   const LiuyaoLineAnnotationsToggle({
     super.key,
-    required this.showLineAnnotations,
-    required this.onChangedLineAnnotations,
     required this.showNaYin,
     required this.onChangedNaYin,
     required this.showTwelveGrowth,
@@ -303,10 +367,10 @@ class LiuyaoLineAnnotationsToggle extends StatelessWidget {
     required this.onChangedFiveStars,
     required this.show28Mansions,
     required this.onChanged28Mansions,
+    this.showAlmanacCalendar = false,
+    this.onToggleAlmanacCalendar,
   });
 
-  final bool showLineAnnotations;
-  final ValueChanged<bool> onChangedLineAnnotations;
   final bool showNaYin;
   final ValueChanged<bool> onChangedNaYin;
   final bool showTwelveGrowth;
@@ -315,104 +379,99 @@ class LiuyaoLineAnnotationsToggle extends StatelessWidget {
   final ValueChanged<bool> onChangedFiveStars;
   final bool show28Mansions;
   final ValueChanged<bool> onChanged28Mansions;
+  final bool showAlmanacCalendar;
+  final VoidCallback? onToggleAlmanacCalendar;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Row(
       key: const Key('line-annotations-toggle'),
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: BoxDecoration(
-        color: _softPaper,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _rule, width: .8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '显示卦爻信息',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      '控制爻位下方纳音、十二长生、五星、二十八宿的显示',
-                      style: TextStyle(color: _mutedInk, fontSize: 9),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                key: const Key('line-annotations-switch'),
-                value: showLineAnnotations,
-                onChanged: onChangedLineAnnotations,
-                activeColor: _cinnabar,
-              ),
-            ],
+      children: [
+        Expanded(
+          child: _annotationChip(
+            label: '纳音',
+            selected: showNaYin,
+            onChanged: onChangedNaYin,
+            key: const Key('show-nayin'),
           ),
-          if (showLineAnnotations) ...[
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                _annotationChip(
-                  label: '纳音',
-                  selected: showNaYin,
-                  onChanged: onChangedNaYin,
-                  key: const Key('show-nayin'),
-                ),
-                _annotationChip(
-                  label: '十二长生',
-                  selected: showTwelveGrowth,
-                  onChanged: onChangedTwelveGrowth,
-                  key: const Key('show-twelve-growth'),
-                ),
-                _annotationChip(
-                  label: '五星',
-                  selected: showFiveStars,
-                  onChanged: onChangedFiveStars,
-                  key: const Key('show-five-stars'),
-                ),
-                _annotationChip(
-                  label: '二十八宿',
-                  selected: show28Mansions,
-                  onChanged: onChanged28Mansions,
-                  key: const Key('show-28-mansions'),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: _annotationChip(
+            label: '长生',
+            selected: showTwelveGrowth,
+            onChanged: onChangedTwelveGrowth,
+            key: const Key('show-twelve-growth'),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: _annotationChip(
+            label: '五星',
+            selected: showFiveStars,
+            onChanged: onChangedFiveStars,
+            key: const Key('show-five-stars'),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: _annotationChip(
+            label: '星宿',
+            selected: show28Mansions,
+            onChanged: onChanged28Mansions,
+            key: const Key('show-28-mansions'),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: _annotationChip(
+            label: '万年历',
+            selected: showAlmanacCalendar,
+            onChanged: onToggleAlmanacCalendar == null
+                ? null
+                : (_) => onToggleAlmanacCalendar!(),
+            key: const Key('show-almanac-calendar'),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _annotationChip({
     required String label,
     required bool selected,
-    required ValueChanged<bool> onChanged,
+    ValueChanged<bool>? onChanged,
     required Key key,
   }) {
-    return FilterChip(
-      key: key,
-      label: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: selected ? Colors.white : _ink),
+    return Material(
+      color: selected ? _cinnabar : Colors.transparent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        key: key,
+        onTap: onChanged == null ? null : () => onChanged(!selected),
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? _cinnabar : _rule,
+              width: .8,
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 10,
+              height: 1.0,
+              color: selected ? Colors.white : _mutedInk,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
-      selected: selected,
-      onSelected: onChanged,
-      selectedColor: _cinnabar,
-      checkmarkColor: Colors.white,
-      visualDensity: VisualDensity.compact,
     );
   }
 }
@@ -432,9 +491,11 @@ class LiuyaoCoreChart extends StatelessWidget {
       showFiveStars: true,
       show28Mansions: true,
     ),
+    this.footer,
   });
 
   final CastPreview preview;
+  final Widget? footer;
   final bool lightHeader;
   final bool showSummaryHeader;
   final String growthReference;
@@ -457,11 +518,11 @@ class LiuyaoCoreChart extends StatelessWidget {
       ],
       _ChartTable(
         preview: preview,
-        showFlowSummary: !showSummaryHeader,
         growthReference: growthReference,
         onGrowthTap: onGrowthTap,
         annotationMode: annotationMode,
         visibility: visibility,
+        footer: footer,
       ),
     ],
   );
@@ -567,11 +628,11 @@ class _LegacySnapshotNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     key: const Key('legacy-snapshot-notice'),
-    padding: const EdgeInsets.all(13),
+    padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFEDEA),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0x33B3261E)),
+      color: DSColors.glowCinnabar,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: _cinnabar.withValues(alpha: .25)),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,36 +662,34 @@ class _ShenshaAnnotations extends StatelessWidget {
     final bodyMarkers = preview.annotations.bodyMarkers;
     return Container(
       key: const Key('shensha-annotations'),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF31251F),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x16251D18),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
+        color: DSColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: DSColors.hairline, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Text(
                 '神煞与身命标注',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                style: DSTypography.body(
+                  fontSize: 15,
+                  weight: FontWeight.w600,
+                  color: DSColors.textPrimary,
                 ),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '逐项冻结 · 不作吉凶评分',
-                  style: TextStyle(color: Color(0xFFBEB3AA), fontSize: 9),
+                  style: DSTypography.body(
+                    fontSize: 10,
+                    weight: FontWeight.w400,
+                    color: DSColors.textMuted,
+                  ),
                 ),
               ),
             ],
@@ -682,28 +741,29 @@ class _BodyMarkerResultRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
       decoration: BoxDecoration(
-        color: matched ? const Color(0xFF4A3028) : const Color(0xFF3A302B),
-        borderRadius: BorderRadius.circular(14),
+        color: matched ? DSColors.glassWeak : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: matched ? const Color(0x66DFA58E) : const Color(0x224D4039),
+          color: matched ? DSColors.glowJade : DSColors.hairline,
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 34,
+            height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: matched ? _cinnabar : const Color(0xFF594D47),
-              borderRadius: BorderRadius.circular(11),
+              color: matched ? DSColors.celadon : DSColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: DSColors.hairline, width: 1),
             ),
             child: Text(
               label,
-              style: const TextStyle(
-                color: Colors.white,
+              style: DSTypography.body(
                 fontSize: 11,
-                fontWeight: FontWeight.w900,
+                weight: FontWeight.w600,
+                color: matched ? Colors.white : DSColors.textMuted,
               ),
             ),
           ),
@@ -714,20 +774,21 @@ class _BodyMarkerResultRow extends StatelessWidget {
               children: [
                 Text(
                   heading,
-                  style: const TextStyle(
-                    color: Color(0xFFFFD7C7),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  style: DSTypography.body(
+                    fontSize: 12,
+                    weight: FontWeight.w600,
+                    color: DSColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   detail,
-                  style: TextStyle(
-                    color: matched
-                        ? const Color(0xFFF4E8DF)
-                        : const Color(0xFFBEB3AA),
+                  style: DSTypography.body(
                     fontSize: 10,
+                    weight: FontWeight.w400,
+                    color: matched
+                        ? DSColors.textSecondary
+                        : DSColors.textMuted,
                   ),
                 ),
               ],
@@ -765,28 +826,29 @@ class _ShenshaResultRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
       decoration: BoxDecoration(
-        color: matched ? const Color(0xFF4A3028) : const Color(0xFF3A302B),
-        borderRadius: BorderRadius.circular(14),
+        color: matched ? DSColors.glassWeak : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: matched ? const Color(0x66DFA58E) : const Color(0x224D4039),
+          color: matched ? DSColors.glowJade : DSColors.hairline,
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 34,
+            height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: matched ? _cinnabar : const Color(0xFF594D47),
-              borderRadius: BorderRadius.circular(11),
+              color: matched ? DSColors.celadon : DSColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: DSColors.hairline, width: 1),
             ),
             child: Text(
               result.displayName,
-              style: const TextStyle(
-                color: Colors.white,
+              style: DSTypography.body(
                 fontSize: 11,
-                fontWeight: FontWeight.w900,
+                weight: FontWeight.w600,
+                color: matched ? Colors.white : DSColors.textMuted,
               ),
             ),
           ),
@@ -797,20 +859,21 @@ class _ShenshaResultRow extends StatelessWidget {
               children: [
                 Text(
                   '${result.basisPillarGanZhi}日 · ${result.basisValue}$basisUnit取${result.targetBranches.join('、')}',
-                  style: const TextStyle(
-                    color: Color(0xFFFFD7C7),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  style: DSTypography.body(
+                    fontSize: 12,
+                    weight: FontWeight.w600,
+                    color: DSColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   matchText,
-                  style: TextStyle(
-                    color: matched
-                        ? const Color(0xFFF4E8DF)
-                        : const Color(0xFFBEB3AA),
+                  style: DSTypography.body(
                     fontSize: 10,
+                    weight: FontWeight.w400,
+                    color: matched
+                        ? DSColors.textSecondary
+                        : DSColors.textMuted,
                   ),
                 ),
               ],
@@ -819,7 +882,7 @@ class _ShenshaResultRow extends StatelessWidget {
           const SizedBox(width: 6),
           Icon(
             matched ? Icons.adjust_rounded : Icons.remove_circle_outline,
-            color: matched ? const Color(0xFFFFB59B) : const Color(0xFF8E827A),
+            color: matched ? DSColors.jade : DSColors.textFaint,
             size: 18,
           ),
         ],
@@ -837,6 +900,29 @@ class _TwelveStagesLedger extends StatelessWidget {
     required this.onModeChanged,
   });
 
+  /// 参照 chip：四柱排与五行排共用；等宽排布，选中青瓷底。
+  static Widget _referenceChip(
+    MapEntry<String, String> entry,
+    String selectedReference,
+    ValueChanged<String> onReferenceChanged,
+  ) {
+    final selected = selectedReference == entry.key;
+    return Center(
+      child: ChoiceChip(
+        key: Key('growth-reference-${entry.key}'),
+        label: Text(entry.value),
+        selected: selected,
+        onSelected: (_) => onReferenceChanged(entry.key),
+        labelStyle: TextStyle(
+          fontSize: 10,
+          color: selected ? Colors.white : DSColors.textSecondary,
+        ),
+        selectedColor: DSColors.celadon,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+
   final CastPreview preview;
   final String selectedReference;
   final ValueChanged<String> onReferenceChanged;
@@ -847,11 +933,16 @@ class _TwelveStagesLedger extends StatelessWidget {
   Widget build(BuildContext context) {
     final rule = preview.annotations.fiveElementTwelveStages;
     final results = rule.lineResults.reversed.toList(growable: false);
-    final labels = const <String, String>{
+    final baseByPosition = {
+      for (final line in preview.chart.base.lines) line.position: line,
+    };
+    const pillarLabels = <String, String>{
       'year': '年柱',
       'month': '月柱',
       'day': '日柱',
       'hour': '时柱',
+    };
+    const elementLabels = <String, String>{
       'element:木': '木',
       'element:火': '火',
       'element:土': '土',
@@ -860,53 +951,47 @@ class _TwelveStagesLedger extends StatelessWidget {
     };
     return Container(
       key: const Key('twelve-stages-ledger'),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
-        color: _paper,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _rule),
+        color: DSColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: DSColors.hairline, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '卦面标注',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            style: DSTypography.body(
+              fontSize: 15,
+              weight: FontWeight.w600,
+              color: DSColors.textPrimary,
+            ),
           ),
-          const Text(
+          Text(
             '切换标注类型，卦面小字同步刷新',
-            style: TextStyle(color: _mutedInk, fontSize: 9),
+            style: DSTypography.body(
+              fontSize: 10,
+              weight: FontWeight.w400,
+              color: DSColors.textMuted,
+            ),
           ),
           const SizedBox(height: 8),
-          SegmentedButton<String>(
-            key: const Key('annotation-mode-switch'),
+          DSSegmentedControl<String>(
+            keyOverride: const Key('annotation-mode-switch'),
             segments: const [
-              ButtonSegment(
+              DSSegmentItem(
                 value: 'twelve_growth',
-                icon: Icon(Icons.grain, size: 15),
-                label: Text('十二长生'),
+                label: '十二长生',
+                icon: Icons.grain,
               ),
-              ButtonSegment(
+              DSSegmentItem(
                 value: 'five_stars',
-                icon: Icon(Icons.star_outline, size: 15),
-                label: Text('京房五星'),
+                label: '京房五星',
+                icon: Icons.star_outline,
               ),
             ],
             selected: {annotationMode},
-            showSelectedIcon: false,
-            style: ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              side: const WidgetStatePropertyAll(BorderSide(color: _cinnabar)),
-              backgroundColor: WidgetStateProperty.resolveWith(
-                (states) => states.contains(WidgetState.selected)
-                    ? _cinnabar
-                    : _softPaper,
-              ),
-              foregroundColor: WidgetStateProperty.resolveWith(
-                (states) =>
-                    states.contains(WidgetState.selected) ? Colors.white : _ink,
-              ),
-            ),
             onSelectionChanged: (selection) {
               onModeChanged(selection.first);
             },
@@ -915,36 +1000,35 @@ class _TwelveStagesLedger extends StatelessWidget {
           if (annotationMode == 'five_stars')
             _FiveStarsLedger(preview: preview)
           else ...[
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: labels.entries
-                  .map((entry) {
-                    final selected = selectedReference == entry.key;
-                    return ChoiceChip(
-                      key: Key('growth-reference-${entry.key}'),
-                      label: Text(entry.value),
-                      selected: selected,
-                      onSelected: (_) => onReferenceChanged(entry.key),
-                      labelStyle: TextStyle(
-                        fontSize: 10,
-                        color: selected ? Colors.white : _ink,
-                      ),
-                      selectedColor: _cinnabar,
-                      visualDensity: VisualDensity.compact,
-                    );
-                  })
-                  .toList(growable: false),
+            // 参照分两排：四柱一排、五行一排（2026-09-01 需求）。
+            Row(
+              children: [
+                for (final entry in pillarLabels.entries)
+                  Expanded(
+                    child: _referenceChip(entry, selectedReference, onReferenceChanged),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                for (final entry in elementLabels.entries)
+                  Expanded(
+                    child: _referenceChip(entry, selectedReference, onReferenceChanged),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             _TwelveStagesHeader(selectedReference: selectedReference),
             const SizedBox(height: 4),
-            ...results.map(
-              (result) => _TwelveStagesRow(
+            ...results.map((result) {
+              final branch = baseByPosition[result.position]?.najia.earthlyBranch ?? '';
+              return _TwelveStagesRow(
                 result: result,
                 selectedReference: selectedReference,
-              ),
-            ),
+                lineBranch: branch,
+              );
+            }),
             const Padding(
               padding: EdgeInsets.fromLTRB(2, 8, 2, 0),
               child: Text(
@@ -997,26 +1081,30 @@ class _FiveStarsLedger extends StatelessWidget {
         Container(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           decoration: BoxDecoration(
-            color: _mansionPaper,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0x55D49A26)),
+            color: DSColors.glowCeladon,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: DSColors.metalLine),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 '${hexagram.name} · ${hexagram.palaceName}宫第${hexagram.palaceSequence}卦',
-                style: const TextStyle(
-                  color: _ink,
+                style: DSTypography.body(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  weight: FontWeight.w600,
+                  color: DSColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 '世爻${world.positionName}起${world.starName}；应爻${response.positionName}为克制星'
                 '${response.starName}',
-                style: const TextStyle(color: _mutedInk, fontSize: 10),
+                style: DSTypography.body(
+                  fontSize: 10,
+                  weight: FontWeight.w400,
+                  color: DSColors.textMuted,
+                ),
               ),
             ],
           ),
@@ -1024,9 +1112,9 @@ class _FiveStarsLedger extends StatelessWidget {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: _softPaper,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _rule, width: .8),
+            color: DSColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: DSColors.hairline, width: 1),
           ),
           child: Column(
             children: [
@@ -1084,7 +1172,7 @@ class _FiveStarsLedger extends StatelessWidget {
                           style: TextStyle(
                             color: _elementStarColor(placement.element),
                             fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -1109,7 +1197,7 @@ class _FiveStarsLedger extends StatelessWidget {
                             fontSize: 11,
                             fontWeight:
                                 placement.role == '世' || placement.role == '应'
-                                ? FontWeight.w800
+                                ? FontWeight.w600
                                 : FontWeight.w400,
                           ),
                         ),
@@ -1163,10 +1251,27 @@ class _TwelveStagesRow extends StatelessWidget {
   const _TwelveStagesRow({
     required this.result,
     required this.selectedReference,
+    required this.lineBranch,
   });
 
   final TwelveStageLineResult result;
   final String selectedReference;
+
+  /// 该爻地支：五行主体列按「主体=五行、观察支=爻支」现算，
+  /// 旧档案冻结的反向语义数据读取时被校正。
+  final String lineBranch;
+
+  TwelveStagePillarResult _correctedElement(TwelveStagePillarResult item) {
+    final element = item.reference.substring('element:'.length);
+    final growth = engine.lookupElementGrowth(element, lineBranch);
+    return TwelveStagePillarResult(
+      reference: item.reference,
+      referenceLabel: item.referenceLabel,
+      pillarGanZhi: item.pillarGanZhi,
+      referenceBranch: lineBranch,
+      stage: (growth['display_phases'] as List).join('、'),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1176,13 +1281,14 @@ class _TwelveStagesRow extends StatelessWidget {
     final selectedElement = result.pillarResults
         .where((item) => item.reference == selectedReference)
         .where((item) => item.reference.startsWith('element:'))
+        .map(_correctedElement)
         .firstOrNull;
     return Container(
       key: Key('twelve-stage-${result.lineId}'),
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.symmetric(vertical: 5),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0x12251D18))),
+        border: Border(bottom: BorderSide(color: DSColors.hairline)),
       ),
       child: Row(
         children: [
@@ -1190,7 +1296,7 @@ class _TwelveStagesRow extends StatelessWidget {
             width: 49,
             child: Text(
               '${result.positionName.replaceAll('爻', '')} · ${result.lineElement}',
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
             ),
           ),
           ...fourPillars.map(
@@ -1222,7 +1328,7 @@ class _StageCell extends StatelessWidget {
     margin: const EdgeInsets.symmetric(horizontal: 2),
     padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 1),
     decoration: BoxDecoration(
-      color: emphasized ? const Color(0xFFF8E8DF) : _softPaper,
+      color: emphasized ? DSColors.glowCinnabar : _softPaper,
       borderRadius: BorderRadius.circular(8),
     ),
     child: Column(
@@ -1243,7 +1349,7 @@ class _StageCell extends StatelessWidget {
           style: const TextStyle(
             color: _ink,
             fontSize: 10,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
@@ -1296,84 +1402,64 @@ class _ChartHeader extends StatelessWidget {
     final moving = base.movingPositions.isEmpty
         ? '静卦'
         : '动爻 ${base.movingPositions.join('、')}';
+    // 卦属性（六冲/六合/游魂/归魂）只在下方 MetaTag 行显示一次，宫位行不再重复。
+    final palaceType = switch (base.palaceSequence) {
+      7 => '游魂卦',
+      8 => '归魂卦',
+      _ => null,
+    };
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 17, 18, 18),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: light ? _paper : _ink,
-        borderRadius: BorderRadius.circular(22),
-        border: light ? Border.all(color: _rule) : null,
-        boxShadow: light
-            ? null
-            : const [
-                BoxShadow(
-                  color: Color(0x20251D18),
-                  blurRadius: 24,
-                  offset: Offset(0, 10),
-                ),
-              ],
+        color: DSColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: DSColors.hairline, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.check_circle_outline,
-                color: _cinnabar,
-                size: 18,
-              ),
-              const SizedBox(width: 7),
-              Text(
-                preview.isLegacySnapshot ? '历史卦面快照' : '基础卦面已生成',
-                style: const TextStyle(
-                  color: _cinnabar,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 11),
           Text(
             changed == null
                 ? '${base.name} · 静卦'
                 : '${base.name} → ${changed.name}',
-            style: TextStyle(
-              color: light ? _ink : Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -.5,
+            style: DSTypography.displayLight(
+              fontSize: 24,
+              color: DSColors.textPrimary,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 6),
           Text(
             preview.isLegacySnapshot
                 ? '${base.palace.name}宫${base.palace.element} · $moving'
                 : '${base.upperTrigram.name}上${base.lowerTrigram.name}下 · '
                       '${base.palace.name}宫${base.palace.element} · $moving',
-            style: TextStyle(
-              color: light ? _mutedInk : const Color(0xFFDDD2C8),
+            style: DSTypography.body(
               fontSize: 12,
+              weight: FontWeight.w400,
+              color: DSColors.textMuted,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 6,
             runSpacing: 6,
             children: [
+              if (base.hexagramProperty != null)
+                _MetaTag(text: base.hexagramProperty!, emphasized: true),
+              if (palaceType != null)
+                _MetaTag(text: palaceType, emphasized: true),
+              if (changed?.hexagramProperty != null)
+                _MetaTag(
+                  text: '变${changed!.hexagramProperty!}',
+                  emphasized: true,
+                ),
               if (base.shiPosition > 0)
-                _DarkTag(
-                  text: '世在${_position(base.shiPosition)}',
-                  light: light,
-                ),
+                _MetaTag(text: '世在${_position(base.shiPosition)}'),
               if (base.yingPosition > 0)
-                _DarkTag(
-                  text: '应在${_position(base.yingPosition)}',
-                  light: light,
-                ),
-              if (base.code.isNotEmpty)
-                _DarkTag(text: '卦码 ${base.code}', light: light),
+                _MetaTag(text: '应在${_position(base.yingPosition)}'),
+              if (base.code.isNotEmpty) _MetaTag(text: '卦码 ${base.code}'),
             ],
           ),
         ],
@@ -1386,27 +1472,33 @@ class _ChartHeader extends StatelessWidget {
   }
 }
 
-class _DarkTag extends StatelessWidget {
-  const _DarkTag({required this.text, this.light = false});
+class _MetaTag extends StatelessWidget {
+  const _MetaTag({required this.text, this.emphasized = false});
 
   final String text;
-  final bool light;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: light ? _softPaper : const Color(0xFF3A302B),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0x334D4039)),
+        color: emphasized ? DSColors.cinnabarSoft : DSColors.glassWeak,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: emphasized ? DSColors.cinnabar : DSColors.hairline,
+          width: 1,
+        ),
       ),
       child: Text(
         text,
-        style: TextStyle(
-          color: light ? _ink : const Color(0xFFF3E8DE),
+        // 单汉字无等宽意义：等宽链缺中文字形，Android 会回退默认体
+        // 造成基线漂移，统一走 sans 基准。
+        style: DSTypography.body(
           fontSize: 10,
-          fontWeight: FontWeight.w700,
+          weight: FontWeight.w600,
+          height: 1.4,
+          color: emphasized ? DSColors.cinnabar : DSColors.textSecondary,
         ),
       ),
     );
@@ -1416,7 +1508,7 @@ class _DarkTag extends StatelessWidget {
 class _ChartTable extends StatelessWidget {
   const _ChartTable({
     required this.preview,
-    required this.showFlowSummary,
+    this.footer,
     this.growthReference = 'day',
     this.onGrowthTap,
     this.annotationMode = 'twelve_growth',
@@ -1429,7 +1521,7 @@ class _ChartTable extends StatelessWidget {
   });
 
   final CastPreview preview;
-  final bool showFlowSummary;
+  final Widget? footer;
   final String growthReference;
   final VoidCallback? onGrowthTap;
   final String annotationMode;
@@ -1481,9 +1573,27 @@ class _ChartTable extends StatelessWidget {
           in preview.chart.changed?.lines ?? const <ChangedChartLine>[])
         line.position: line,
     };
-    Map<int, String> growthStages(FiveElementTwelveStages stages) {
+    Map<int, String> growthStages(
+      FiveElementTwelveStages stages,
+      String? Function(int position) branchOf,
+    ) {
       final output = <int, String>{};
+      // 五行主体参照（2026-09-01 语义修正）：展示层统一按
+      // 「主体=所选五行、观察支=爻支」现算——旧档案冻结的是修正前的
+      // 反向语义（火/土同值、土爻恒帝旺），读取时以引擎新表覆盖。
+      final elementSubject = growthReference.startsWith('element:')
+          ? growthReference.substring('element:'.length)
+          : null;
       for (final result in stages.lineResults) {
+        if (elementSubject != null) {
+          final branch = branchOf(result.position);
+          if (branch != null && branch.isNotEmpty) {
+            output[result.position] =
+                engine.lookupElementGrowth(elementSubject, branch)['display_phases']
+                    .join('、') as String;
+          }
+          continue;
+        }
         for (final pillar in result.pillarResults) {
           if (pillar.reference == growthReference) {
             output[result.position] = pillar.stage;
@@ -1494,47 +1604,57 @@ class _ChartTable extends StatelessWidget {
       return output;
     }
 
-    // 五星模式下十二长生槽位让位给五星，不计算长生阶段。
-    Map<int, String> growthStagesOrEmpty(FiveElementTwelveStages stages) =>
-        annotationMode == 'five_stars'
-        ? const <int, String>{}
-        : growthStages(stages);
+    // 十二长生始终计算：五星不再挤占长生槽位，两者在爻位行并列独立显示，
+    // annotationMode 只控制展开面板（长生账本 / 五星账本）的内容。
+    final baseByPosition = {
+      for (final line in base.lines) line.position: line,
+    };
+    final hiddenByPosition = {
+      for (final line in base.lines)
+        if (line.hidden != null) line.position: line.hidden!,
+    };
+
+    Map<int, String> growthStagesOrEmpty(
+      FiveElementTwelveStages stages,
+      String? Function(int position) branchOf,
+    ) => growthStages(stages, branchOf);
 
     final dayStageByPosition = growthStagesOrEmpty(
       preview.annotations.fiveElementTwelveStages,
+      (position) => baseByPosition[position]?.najia.earthlyBranch,
     );
     final hiddenDayStageByPosition = hiddenAnnotations == null
         ? const <int, String>{}
-        : growthStagesOrEmpty(hiddenAnnotations.fiveElementTwelveStages);
+        : growthStagesOrEmpty(
+            hiddenAnnotations.fiveElementTwelveStages,
+            (position) => hiddenByPosition[position]?.najia.earthlyBranch,
+          );
     final changedDayStageByPosition = changedAnnotations == null
         ? const <int, String>{}
-        : growthStagesOrEmpty(changedAnnotations.fiveElementTwelveStages);
+        : growthStagesOrEmpty(
+            changedAnnotations.fiveElementTwelveStages,
+            (position) => changedByPosition[position]?.najia.earthlyBranch,
+          );
     return Container(
       key: const Key('liuyao-chart-table'),
-      padding: const EdgeInsets.fromLTRB(10, 14, 10, 10),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 5),
       decoration: BoxDecoration(
-        color: _paper,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _rule, width: .8),
+        color: DSColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: DSColors.hairline, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _PillarContextPanel(preview: preview),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _HexagramComparisonHeader(
             base: base,
             changed: preview.chart.changed,
             canonicalPalaceSequence: preview.hasCanonicalPalaceSequence,
-            showFlowSummary: showFlowSummary,
           ),
-          if (mansions != null) ...[
-            const SizedBox(height: 8),
-            _MansionWorldSummary(mansions: mansions),
-          ],
-          const SizedBox(height: 10),
-          const _ChartColumnHeader(),
-          const Divider(height: 12, thickness: .8),
+          // 线框图卦面没有列头行：列含义由内容自明，删掉整行以贴近 29px 爻行。
+          const SizedBox(height: 4),
           ...base.lines.reversed.map(
             (line) => _ChartLineRow(
               line: line,
@@ -1553,56 +1673,14 @@ class _ChartTable extends StatelessWidget {
               visibility: visibility,
             ),
           ),
+          if (footer != null) ...[
+            const SizedBox(height: 8),
+            footer!,
+          ],
         ],
       ),
     );
   }
-}
-
-class _MansionWorldSummary extends StatelessWidget {
-  const _MansionWorldSummary({required this.mansions});
-
-  final TwentyEightMansions mansions;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('mansion-world-summary'),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-    decoration: BoxDecoration(
-      color: _mansionPaper.withValues(alpha: 0.55),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _mansionInk.withValues(alpha: 0.18)),
-    ),
-    child: Row(
-      children: [
-        const Text(
-          '京房宿：',
-          style: TextStyle(
-            color: _mutedInk,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(
-          '世爻${mansions.worldMansion}宿',
-          style: const TextStyle(
-            color: _mansionInk,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          '64卦序·${mansions.hexagramGlobalIndex + 1}',
-          style: const TextStyle(
-            color: _mutedInk,
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _PillarContextPanel extends StatelessWidget {
@@ -1640,30 +1718,11 @@ class _PillarContextPanel extends StatelessWidget {
     ];
     return Container(
       key: const Key('pillar-time-panel'),
-      padding: const EdgeInsets.fromLTRB(2, 2, 2, 6),
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
       child: Column(
         children: [
-          Row(
-            children: [
-              const Text(
-                '四柱',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-              ),
-              const Spacer(),
-              Text(
-                preview.fourPillarsSource == 'manual' ? '手动填写' : '自动计算',
-                key: const Key('four-pillars-source-label'),
-                style: TextStyle(
-                  color: preview.fourPillarsSource == 'manual'
-                      ? _cinnabar
-                      : _mutedInk,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
+          // 线框图四柱区只有两行居中文字：干支一行 + 旬空一行。
+          // 「四柱/自动计算」标题行收进四柱首格的后缀提示，不再占独立行。
           Row(
             children: [
               for (final item in items)
@@ -1676,20 +1735,25 @@ class _PillarContextPanel extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 2),
           Row(
             children: [
               for (final item in items)
                 Expanded(
                   child: Text(
-                    item.voidText == '未记录' ? '未记录' : '${item.voidText}空',
+                    item.voidText == '未记录'
+                        ? '未记录'
+                        : '${_voidLabel(item.keyName)}:${item.voidText}',
                     key: Key('time-${item.keyName}-void'),
                     textAlign: TextAlign.center,
                     maxLines: 1,
-                    style: const TextStyle(
-                      color: _mutedInk,
+                    style: DSTypography.body(
                       fontSize: 9,
-                      fontWeight: FontWeight.w700,
+                      weight: FontWeight.w400,
+                      height: 1.4,
+                      color: item.keyName == 'day'
+                          ? DSColors.celadonDeep
+                          : DSColors.textMuted,
                     ),
                   ),
                 ),
@@ -1731,27 +1795,29 @@ class _PillarCell extends StatelessWidget {
           Text(
             stem,
             key: Key('time-$keyName-stem'),
-            style: TextStyle(
+            style: DSTypography.body(
+              fontSize: 13,
+              weight: FontWeight.w400,
+              height: 1.4,
               color: _stemColor(stem),
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
             ),
           ),
           Text(
             branch,
             key: Key('time-$keyName-branch'),
-            style: TextStyle(
+            style: DSTypography.body(
+              fontSize: 13,
+              weight: FontWeight.w400,
+              height: 1.4,
               color: _branchColor(branch),
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
             ),
           ),
           Text(
             suffix,
-            style: const TextStyle(
-              color: _ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+            style: DSTypography.body(
+              fontSize: 12,
+              weight: FontWeight.w400,
+              color: DSColors.textSecondary,
             ),
           ),
         ],
@@ -1765,32 +1831,36 @@ class _HexagramComparisonHeader extends StatelessWidget {
     required this.base,
     required this.changed,
     required this.canonicalPalaceSequence,
-    required this.showFlowSummary,
   });
+
+  /// 卦属性合并标签：六冲/六合 + 游魂/归魂（京房八宫序 7/8），
+  /// 各来源只取一次，null 自动跳过，不再重复拼接。
+  static String? _propertyLabel(String? hexagramProperty, int palaceSequence) {
+    final palaceType = switch (palaceSequence) {
+      7 => '游魂',
+      8 => '归魂',
+      _ => null,
+    };
+    return [
+      hexagramProperty,
+      palaceType,
+    ].whereType<String>().isEmpty
+        ? null
+        : [
+            hexagramProperty,
+            palaceType,
+          ].whereType<String>().join(' · ');
+  }
 
   final BaseHexagram base;
   final ChangedHexagram? changed;
   final bool canonicalPalaceSequence;
-  final bool showFlowSummary;
 
   @override
   Widget build(BuildContext context) {
     final changedHexagram = changed;
     return Column(
       children: [
-        if (showFlowSummary) ...[
-          Text(
-            changedHexagram == null
-                ? '${base.name} · 静卦'
-                : '${base.name} → ${changedHexagram.name}',
-            style: const TextStyle(
-              color: _mutedInk,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-        ],
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1803,6 +1873,11 @@ class _HexagramComparisonHeader extends StatelessWidget {
                 palaceSequence: canonicalPalaceSequence
                     ? base.palaceSequence
                     : 0,
+                // 卦属性只在此显示一次：六冲/六合（引擎判定）+ 游魂/归魂（宫序 7/8）。
+                property: _propertyLabel(
+                  base.hexagramProperty,
+                  base.palaceSequence,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -1815,12 +1890,14 @@ class _HexagramComparisonHeader extends StatelessWidget {
                 palaceSequence: canonicalPalaceSequence
                     ? changedHexagram?.palaceSequence ?? 0
                     : 0,
+                property: _propertyLabel(
+                  changedHexagram?.hexagramProperty,
+                  changedHexagram?.palaceSequence ?? 0,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        _HiddenHexagramIdentityLine(hidden: base.hiddenHexagram),
       ],
     );
   }
@@ -1833,139 +1910,67 @@ class _HexagramTitleBlock extends StatelessWidget {
     required this.name,
     required this.palace,
     required this.palaceSequence,
+    this.property,
   });
 
   final String label;
   final String name;
   final TrigramSummary? palace;
   final int palaceSequence;
+  final String? property;
 
   @override
   Widget build(BuildContext context) {
+    final propertySuffix = property == null ? '' : '（$property）';
     final palaceText = palace == null
         ? '卦宫未记录'
         : palaceSequence > 0
-        ? '/ ${palace!.name}宫·$palaceSequence'
-        : '/ ${palace!.name}宫·序位未记录';
+        ? '/ ${palace!.name}宫·$palaceSequence$propertySuffix'
+        : '${palace!.name}宫 · 序位未记录$propertySuffix';
+    // 线框图卦名区为紧凑两层结构：卦名（带「本卦/变卦」行内小字前缀）
+    // 与宫位属性行，不再单独占一层标题，压缩卦面头部高度。
     return Column(
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: _mutedInk,
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 3),
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(
-            name,
-            maxLines: 1,
-            style: const TextStyle(
-              color: _ink,
-              fontFamily: 'Songti SC',
-              fontFamilyFallback: ['Noto Serif CJK SC', 'Noto Serif SC'],
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                label,
+                style: DSTypography.tableHeader(color: DSColors.textMuted),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                name,
+                maxLines: 1,
+                style: DSTypography.displayLight(
+                  fontSize: 13,
+                  color: DSColors.textPrimary,
+                  height: 1.1,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 1),
         Text(
           palaceText,
           maxLines: 1,
-          style: TextStyle(
-            color: palace == null ? _mutedInk : _elementColor(palace!.element),
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
+          overflow: TextOverflow.ellipsis,
+          style: DSTypography.body(
+            fontSize: 9,
+            weight: FontWeight.w500,
+            color: palace == null
+                ? DSColors.textMuted
+                : _elementColor(palace!.element),
           ),
         ),
       ],
     );
   }
-}
-
-class _HiddenHexagramIdentityLine extends StatelessWidget {
-  const _HiddenHexagramIdentityLine({required this.hidden});
-
-  final HiddenHexagram? hidden;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      key: const Key('hidden-hexagram-summary'),
-      children: [
-        const Text(
-          '伏卦：',
-          style: TextStyle(
-            color: _mutedInk,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            hidden?.name ?? '旧档案未记录',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        if (hidden != null)
-          Text(
-            '/ ${hidden!.palaceBasis.name}宫规则',
-            style: TextStyle(
-              color: _elementColor(hidden!.palaceBasis.element),
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ChartColumnHeader extends StatelessWidget {
-  const _ChartColumnHeader();
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 5),
-    child: Row(
-      children: [
-        const SizedBox(width: 36, child: _ColumnLabel('六神')),
-        const Expanded(flex: 2, child: _ColumnLabel('伏神')),
-        const Expanded(flex: 2, child: _ColumnLabel('本卦')),
-        const SizedBox(width: 46, child: _ColumnLabel('爻·世应')),
-        const Expanded(flex: 2, child: _ColumnLabel('变卦')),
-        const SizedBox(width: 46, child: _ColumnLabel('爻·世应')),
-      ],
-    ),
-  );
-}
-
-class _ColumnLabel extends StatelessWidget {
-  const _ColumnLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    textAlign: TextAlign.center,
-    maxLines: 1,
-    style: const TextStyle(
-      color: _mutedInk,
-      fontSize: 8,
-      fontWeight: FontWeight.w700,
-    ),
-  );
 }
 
 class _ChartLineRow extends StatelessWidget {
@@ -2008,40 +2013,50 @@ class _ChartLineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 线框图中的每一爻是短行：主信息与附加字段同一紧凑基线内展示。
     final hidden = line.hidden;
     return Container(
       key: Key('chart-line-${line.position}'),
-      padding: const EdgeInsets.fromLTRB(5, 8, 5, 7),
+      padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
       decoration: BoxDecoration(
-        color: line.changing
-            ? _cinnabar.withValues(alpha: .045)
-            : Colors.transparent,
-        border: Border(
-          bottom: BorderSide(
-            color: line.position == 4 ? LiuyaoColors.inkMedium : _rule,
-            width: line.position == 4 ? 1.1 : .8,
-          ),
-        ),
+        color: line.changing ? DSColors.glowCinnabar : Colors.transparent,
+        border: line.changing
+            ? const Border(
+                left: BorderSide(color: _cinnabar, width: 2),
+                bottom: BorderSide(color: DSColors.hairline),
+              )
+            : Border(
+                bottom: BorderSide(
+                  color: line.position == 4
+                      ? DSColors.hairlineStrong
+                      : DSColors.hairline,
+                ),
+              ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 36,
+            width: 34,
             child: Column(
               children: [
                 Text(
                   _displaySixGod(line.sixGod),
                   key: Key('six-god-${line.position}'),
-                  style: const TextStyle(
-                    color: _ink,
+                  style: DSTypography.body(
                     fontSize: 11,
-                    fontWeight: FontWeight.w900,
+                    weight: FontWeight.w700,
+                    color: _sixGodColor(line.sixGod),
                   ),
                 ),
+                const SizedBox(height: 1),
                 Text(
                   _shortPosition(line.position),
-                  style: const TextStyle(color: _mutedInk, fontSize: 7),
+                  style: DSTypography.body(
+                    fontSize: 8,
+                    weight: FontWeight.w400,
+                    color: DSColors.textMuted,
+                  ),
                 ),
               ],
             ),
@@ -2081,7 +2096,7 @@ class _ChartLineRow extends StatelessWidget {
             ),
           ),
           SizedBox(
-            width: 46,
+            width: 42,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -2098,14 +2113,18 @@ class _ChartLineRow extends StatelessWidget {
                     position: line.position,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   line.role ?? '',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: _cinnabar,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
+                  style: DSTypography.body(
+                    fontSize: 9,
+                    weight: FontWeight.w600,
+                    color: line.role == '世'
+                        ? DSColors.celadonDeep
+                        : line.role == '应'
+                        ? DSColors.textFaint
+                        : Colors.transparent,
                   ),
                 ),
               ],
@@ -2129,7 +2148,7 @@ class _ChartLineRow extends StatelessWidget {
                   ),
           ),
           SizedBox(
-            width: 46,
+            width: 42,
             child: changed == null
                 ? const Center(child: Text('·'))
                 : Column(
@@ -2143,15 +2162,19 @@ class _ChartLineRow extends StatelessWidget {
                           position: line.position,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         changed!.role ?? '',
                         key: Key('changed-role-${line.position}'),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: _cinnabar,
+                        style: TextStyle(
+                          color: changed!.role == '世'
+                              ? DSColors.celadonDeep
+                              : changed!.role == '应'
+                              ? DSColors.textFaint
+                              : Colors.transparent,
                           fontSize: 8,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -2170,7 +2193,7 @@ class _EmptyNajiaCell extends StatelessWidget {
   Widget build(BuildContext context) => const Text(
     '·',
     textAlign: TextAlign.center,
-    style: TextStyle(color: Color(0x55251D18), fontSize: 12),
+    style: TextStyle(color: _mutedInk, fontSize: 12),
   );
 }
 
@@ -2219,29 +2242,31 @@ class _NajiaCell extends StatelessWidget {
           children: [
             Text(
               relation,
-              style: TextStyle(
-                color: muted ? _mutedInk : _ink,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+              style: DSTypography.body(
+                fontSize: 12,
+                weight: FontWeight.w600,
+                color: muted ? DSColors.textMuted : DSColors.textPrimary,
               ),
             ),
-            const SizedBox(width: 2),
+            const SizedBox(width: 1),
             Text(
               najia.heavenlyStem,
               key: Key('$prefix-stem-$position'),
-              style: TextStyle(
+              style: DSTypography.body(
+                fontSize: 12,
+                weight: FontWeight.w700,
+                height: 1.4,
                 color: _stemColor(najia.heavenlyStem),
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
               ),
             ),
             Text(
               najia.earthlyBranch,
               key: Key('$prefix-branch-$position'),
-              style: TextStyle(
+              style: DSTypography.body(
+                fontSize: 12,
+                weight: FontWeight.w700,
+                height: 1.4,
                 color: _branchColor(najia.earthlyBranch),
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
               ),
             ),
           ],
@@ -2267,102 +2292,69 @@ class _NajiaCell extends StatelessWidget {
   /// 爻位标注行：纳音 · 十二长生 · 五星 · 二十八宿。
   /// 缺失片段不渲染分隔符，避免出现多余的「··」。
   ///
-  /// 五星模式（annotationMode == 'five_stars'）下，十二长生槽位改为显示
-  /// 该爻五星短名，并隐藏独立五星段，避免同一信息重复出现。
+  /// 十二长生与五星并列独立显示（各自受开关控制），annotationMode
+  /// 只决定点击弹窗与展开面板的默认参照，不再互相挤占槽位。
   List<Widget> _buildAnnotationSegments() {
     final segments = <Widget>[];
     if (visibility.showNaYin) {
+      final nayin = najia.nayin ?? '';
+      final nayinColor = _nayinColor(nayin);
       segments.add(
         Text(
-          najia.nayin ?? '',
+          nayin,
           key: Key('$prefix-nayin-$position'),
           style: _annotationTextStyle(
-            color: muted ? _mutedInk : LiuyaoColors.inkMuted,
+            color: muted ? nayinColor.withValues(alpha: .55) : nayinColor,
             bold: false,
           ),
         ),
       );
     }
     final growthSlotVisible = visibility.showTwelveGrowth;
-    if (annotationMode == 'five_stars') {
-      if (growthSlotVisible && fiveStar != null) {
-        segments.add(_segmentDot());
-        final starText = Text(
+    if (growthSlotVisible && growthStage != null) {
+      segments.add(_segmentDot());
+      final growthText = Text(
+        growthStage!,
+        key: Key('$prefix-growth-$position'),
+        style: _annotationTextStyle(
+          color: muted ? _mutedInk : LiuyaoColors.inkMuted,
+          bold: true,
+        ),
+      );
+      segments.add(
+        onGrowthTap == null
+            ? growthText
+            : InkWell(
+                key: Key('$prefix-growth-tap-$position'),
+                onTap: onGrowthTap,
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: Text(
+                    growthStage!,
+                    key: Key('$prefix-growth-$position'),
+                    style: _annotationTextStyle(
+                      color: muted ? _mutedInk : _cinnabar,
+                      bold: true,
+                      underline: true,
+                    ),
+                  ),
+                ),
+              ),
+      );
+    }
+    if (visibility.showFiveStars && fiveStar != null) {
+      segments.add(_segmentDot());
+      segments.add(
+        Text(
           _fiveStarDisplayName(fiveStar!.star),
-          key: Key('$prefix-growth-$position'),
+          key: Key('$prefix-fivestar-$position'),
           style: _annotationTextStyle(
             color: _elementStarColor(fiveStar!.element),
             bold: true,
           ),
-        );
-        segments.add(
-          onGrowthTap == null
-              ? starText
-              : InkWell(
-                  key: Key('$prefix-growth-tap-$position'),
-                  onTap: onGrowthTap,
-                  borderRadius: BorderRadius.circular(4),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 1),
-                    child: Text(
-                      _fiveStarDisplayName(fiveStar!.star),
-                      key: Key('$prefix-growth-$position'),
-                      style: _annotationTextStyle(
-                        color: _elementStarColor(fiveStar!.element),
-                        bold: true,
-                        underline: true,
-                      ),
-                    ),
-                  ),
-                ),
-        );
-      }
-    } else {
-      if (growthSlotVisible && growthStage != null) {
-        segments.add(_segmentDot());
-        final growthText = Text(
-          growthStage!,
-          key: Key('$prefix-growth-$position'),
-          style: _annotationTextStyle(
-            color: muted ? _mutedInk : LiuyaoColors.inkMuted,
-            bold: true,
-          ),
-        );
-        segments.add(
-          onGrowthTap == null
-              ? growthText
-              : InkWell(
-                  key: Key('$prefix-growth-tap-$position'),
-                  onTap: onGrowthTap,
-                  borderRadius: BorderRadius.circular(4),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 1),
-                    child: Text(
-                      growthStage!,
-                      key: Key('$prefix-growth-$position'),
-                      style: _annotationTextStyle(
-                        color: muted ? _mutedInk : _cinnabar,
-                        bold: true,
-                        underline: true,
-                      ),
-                    ),
-                  ),
-                ),
-        );
-      }
-      if (visibility.showFiveStars && fiveStar != null) {
-        segments.add(_segmentDot());
-        segments.add(
-          Text(
-            _fiveStarDisplayName(fiveStar!.star),
-            key: Key('$prefix-fivestar-$position'),
-            style: _annotationTextStyle(
-              color: _elementStarColor(fiveStar!.element),
-              bold: true,
-            ),
-          ),
-        );
-      }
+        ),
+      );
     }
     if (visibility.show28Mansions && mansion != null) {
       segments.add(_segmentDot());
@@ -2370,7 +2362,7 @@ class _NajiaCell extends StatelessWidget {
         Semantics(
           label: '${mansion!.mansion}宿，${mansion!.placementRole}装配',
           child: Text(
-            '${mansion!.mansion}宿',
+            mansion!.mansion,
             key: Key(
               prefix == 'base'
                   ? 'mansion-${mansion!.position}'
@@ -2393,8 +2385,10 @@ class _NajiaCell extends StatelessWidget {
     bool underline = false,
   }) => TextStyle(
     color: color,
-    fontSize: 7,
-    fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+    fontSize: 7.5,
+    // 修复：原三元两分支同为 w600；爻位标注加粗段升至 w700，
+    // 配合加深的五行色，保证小字号下依然清晰可辨。
+    fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
     decoration: underline ? TextDecoration.underline : null,
     decorationColor: color.withValues(alpha: .6),
   );
@@ -2409,11 +2403,11 @@ String _fiveStarDisplayName(String star) => switch (star) {
 
 /// 京房五星五行配色。
 Color _elementStarColor(String element) => switch (element) {
-  '木' => const Color(0xFF2E7D32),
-  '火' => _cinnabar,
-  '土' => const Color(0xFF795548),
-  '金' => const Color(0xFF8D6E63),
-  '水' => const Color(0xFF1565C0),
+  '木' => LiuyaoColors.wood,
+  '火' => LiuyaoColors.fire,
+  '土' => LiuyaoColors.earth,
+  '金' => LiuyaoColors.metal,
+  '水' => LiuyaoColors.water,
   _ => _ink,
 };
 
@@ -2447,10 +2441,10 @@ class _TraditionalYaoGlyph extends StatelessWidget {
                   movingMarker!,
                   key: Key('moving-marker-$position'),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: _cinnabar,
+                  style: DSTypography.body(
                     fontSize: 11,
-                    fontWeight: FontWeight.w900,
+                    weight: FontWeight.w600,
+                    color: _cinnabar,
                     height: 1.0,
                   ),
                 ),
@@ -2461,12 +2455,12 @@ class _TraditionalYaoGlyph extends StatelessWidget {
 }
 
 class _YaoLineShape extends StatelessWidget {
-  const _YaoLineShape({super.key, required this.yang});
+  const _YaoLineShape({required this.yang});
 
   final bool yang;
 
   /// 阴爻、阳爻、本卦、变卦使用同一线高与间隙，保证视觉粗细一致。
-  static const double _lineHeight = 4;
+  static const double _lineHeight = 5;
   static const double _yinGap = 5;
 
   @override
@@ -2475,7 +2469,7 @@ class _YaoLineShape extends StatelessWidget {
       height: _lineHeight,
       decoration: BoxDecoration(
         color: _ink,
-        borderRadius: BorderRadius.circular(2),
+        borderRadius: BorderRadius.circular(1.5),
       ),
     );
     if (yang) return Center(child: segment);
@@ -2490,6 +2484,25 @@ class _YaoLineShape extends StatelessWidget {
 }
 
 String _displaySixGod(String value) => value == '腾蛇' ? '螣蛇' : value;
+
+/// 旬空柱名前缀：年空 / 月空 / 日空 / 时空。
+String _voidLabel(String keyName) => switch (keyName) {
+  'year' => '年空',
+  'month' => '月空',
+  'day' => '日空',
+  _ => '时空',
+};
+
+/// 六神按五行配色（线框图契约）：青龙木绿、朱雀火红、白虎金、玄武水蓝、
+/// 勾陈/腾蛇（螣蛇）土褐。未识别值回退墨色。
+Color _sixGodColor(String value) => switch (value) {
+  '青龙' => LiuyaoColors.wood,
+  '朱雀' => LiuyaoColors.fire,
+  '白虎' => LiuyaoColors.metal,
+  '玄武' => LiuyaoColors.water,
+  '勾陈' || '腾蛇' || '螣蛇' => LiuyaoColors.earth,
+  _ => LiuyaoColors.ink,
+};
 
 String _shortPosition(int position) =>
     const ['初', '二', '三', '四', '五', '上'][position - 1];
@@ -2537,6 +2550,15 @@ Color _elementColor(String element) => switch (element) {
   _ => _mutedInk,
 };
 
+/// 纳音五行配色：纳音名（如「大海水」「炉中火」）以五行字结尾，
+/// 取尾字映射五行色；无法识别时回退墨色。空值保持墨色以兼容旧数据。
+Color _nayinColor(String nayin) {
+  if (nayin.isEmpty) return _mutedInk;
+  final last = String.fromCharCode(nayin.runes.last);
+  const elements = {'木', '火', '土', '金', '水'};
+  return elements.contains(last) ? _elementColor(last) : _mutedInk;
+}
+
 class _CalculationDetails extends StatelessWidget {
   const _CalculationDetails({required this.preview});
 
@@ -2546,27 +2568,35 @@ class _CalculationDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       key: const Key('chart-calculation-details'),
-      color: _paper,
+      color: DSColors.surfaceRaised,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: _rule),
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: DSColors.hairline, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(14, 14, 14, 4),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
             child: Text(
               '计算明细',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              style: DSTypography.body(
+                fontSize: 15,
+                weight: FontWeight.w600,
+                color: DSColors.textPrimary,
+              ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(14, 0, 14, 7),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 7),
             child: Text(
               '展开可核对输入、查表过程与逐爻结果',
-              style: TextStyle(color: _mutedInk, fontSize: 10),
+              style: DSTypography.body(
+                fontSize: 10,
+                weight: FontWeight.w400,
+                color: DSColors.textMuted,
+              ),
             ),
           ),
           ...preview.calculationTrace.map(
@@ -2577,9 +2607,10 @@ class _CalculationDetails extends StatelessWidget {
               childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 13),
               title: Text(
                 trace.label,
-                style: const TextStyle(
+                style: DSTypography.body(
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  weight: FontWeight.w600,
+                  color: DSColors.textPrimary,
                 ),
               ),
               subtitle: Text(
@@ -2630,6 +2661,359 @@ class _CalculationDetails extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 卦面内嵌万年历：点击「万年历」在开关行下方展开的轻量月历。
+/// 每个日期格显示公历日 + 农历（初一显示月名，节气日优先显示节气）；
+/// 选中日在网格下方给出农历全称、日柱干支（五行分色）、纳音与节气/值宿摘要。
+class LiuyaoMiniAlmanacCalendar extends StatefulWidget {
+  const LiuyaoMiniAlmanacCalendar({super.key, this.initialMonth});
+
+  /// 展开时默认显示并选中的日期（默认为起卦时间，缺省为今天所在月）。
+  final DateTime? initialMonth;
+
+  @override
+  State<LiuyaoMiniAlmanacCalendar> createState() =>
+      _LiuyaoMiniAlmanacCalendarState();
+}
+
+class _LiuyaoMiniAlmanacCalendarState extends State<LiuyaoMiniAlmanacCalendar> {
+  late DateTime _month;
+  DateTime? _selectedDay;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialMonth;
+    if (initial == null) {
+      final now = DateTime.now();
+      _month = DateTime(now.year, now.month);
+      _selectedDay = DateTime(now.year, now.month, now.day);
+    } else {
+      _month = DateTime(initial.year, initial.month);
+      _selectedDay = DateTime(initial.year, initial.month, initial.day);
+    }
+  }
+
+  void _shiftMonth(int delta) {
+    setState(() => _month = DateTime(_month.year, _month.month + delta));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final isCurrentMonth =
+        _month.year == today.year && _month.month == today.month;
+    final firstDay = DateTime(_month.year, _month.month);
+    // 周一为首列：周一=0 … 周日=6。
+    final leading = (firstDay.weekday - 1) % 7;
+    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
+    final trailing = (7 - (leading + daysInMonth) % 7) % 7;
+    final cells = <DateTime?>[
+      for (var i = 0; i < leading; i++) null,
+      for (var day = 1; day <= daysInMonth; day++)
+        DateTime(_month.year, _month.month, day),
+      for (var i = 0; i < trailing; i++) null,
+    ];
+    return Container(
+      key: const Key('mini-almanac-calendar'),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: _softPaper,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _rule, width: .8),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _monthArrow(Icons.chevron_left, -1, const Key('mini-cal-prev')),
+              Expanded(
+                child: Text(
+                  '${_month.year}年${_month.month.toString().padLeft(2, '0')}月',
+                  key: const Key('mini-cal-title'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                  ),
+                ),
+              ),
+              _monthArrow(Icons.chevron_right, 1, const Key('mini-cal-next')),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              for (final label in const ['一', '二', '三', '四', '五', '六', '日'])
+                Expanded(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: _mutedInk,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          for (var week = 0; week < cells.length / 7; week++)
+            Row(
+              children: [
+                for (var col = 0; col < 7; col++)
+                  Expanded(
+                    child: _dayCell(
+                      cells[week * 7 + col],
+                      isCurrentMonth: isCurrentMonth,
+                      today: today,
+                    ),
+                  ),
+              ],
+            ),
+          if (_selectedDay != null) ...[
+            const Divider(height: 14, thickness: .7, color: _rule),
+            _selectedDaySummary(_selectedDay!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _monthArrow(IconData icon, int delta, Key key) => SizedBox.square(
+    dimension: 30,
+    child: IconButton(
+      key: key,
+      onPressed: () => _shiftMonth(delta),
+      padding: EdgeInsets.zero,
+      iconSize: 20,
+      icon: Icon(icon, color: _cinnabar),
+    ),
+  );
+
+  /// 格子副行文案：节气优先（朱红），其次农历日（初一显示月名，含闰月）。
+  /// 引擎支持范围（1901-02-19 ~ 2100-02-08）之外返回 null，只显示公历数字。
+  ({String label, bool isTerm})? _cellSubLabel(DateTime day) {
+    if (!engine.isLunarSupported(day)) return null;
+    final term = engine.getSolarTerm(day);
+    if (term != null && term.isNotEmpty) {
+      return (label: term, isTerm: true);
+    }
+    final lunar = engine.solarToLunar(day);
+    return (
+      label: lunar.day == 1 ? lunar.monthCn : lunar.dayCn,
+      isTerm: false,
+    );
+  }
+
+  Widget _dayCell(DateTime? day, {required bool isCurrentMonth, required DateTime today}) {
+    if (day == null) {
+      return const SizedBox(height: 36);
+    }
+    final isToday = isCurrentMonth &&
+        day.year == today.year &&
+        day.month == today.month &&
+        day.day == today.day;
+    final selected = _selectedDay == day;
+    final sub = _cellSubLabel(day);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _selectedDay = day),
+      child: Container(
+        height: 36,
+        margin: const EdgeInsets.symmetric(vertical: 1),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? _cinnabar : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: isToday && !selected
+              ? Border.all(color: _cinnabar.withValues(alpha: .6), width: 1)
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '${day.day}',
+              key: Key('mini-cal-day-${day.year}-${day.month}-${day.day}'),
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.05,
+                color: selected
+                    ? Colors.white
+                    : isToday
+                    ? _cinnabar
+                    : _ink,
+                fontWeight: isToday || selected
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+              ),
+            ),
+            if (sub != null)
+              Text(
+                sub.label,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: TextStyle(
+                  fontSize: 7.5,
+                  height: 1.1,
+                  color: selected
+                      ? Colors.white
+                      : sub.isTerm
+                      ? _cinnabar
+                      : _mutedInk,
+                  fontWeight: sub.isTerm || selected
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 选中日摘要：农历全称 + 生肖 ｜ 日柱干支（五行分色）+ 纳音，附节气/值宿。
+  Widget _selectedDaySummary(DateTime day) {
+    if (!engine.isLunarSupported(day)) {
+      return const Text(
+        '超出万年历支持范围（1901-02-19 ~ 2100-02-08）',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 9.5, color: _mutedInk),
+      );
+    }
+    final lunar = engine.solarToLunar(day);
+    final pillar = engine.calculateDayGanzhi(day);
+    final nayin = engine.getNayin(pillar);
+    final term = engine.getSolarTerm(day);
+    final mansion = engine.calculateDailyMansion(day);
+    final leapPrefix = lunar.isLeapMonth ? '闰' : '';
+    final extras = [
+      if (term != null && term.isNotEmpty) '节气 $term',
+      '值宿 $mansion',
+    ];
+    return Container(
+      key: const Key('mini-cal-detail'),
+      padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+      decoration: BoxDecoration(
+        color: _softPaper,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _rule, width: .7),
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '农历',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        color: _mutedInk,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      key: const Key('mini-cal-detail-lunar'),
+                      '${lunar.yearCn ?? '${lunar.year}年'}年 $leapPrefix${lunar.monthCn}${lunar.dayCn}'
+                      '${lunar.zodiac == null ? '' : ' · ${lunar.zodiac}年'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: _ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(width: .7, height: 26, color: _rule),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '日柱',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        color: _mutedInk,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text.rich(
+                          key: const Key('mini-cal-detail-pillar'),
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: pillar[0],
+                                style: TextStyle(color: _stemColor(pillar[0])),
+                              ),
+                              TextSpan(
+                                text: pillar[1],
+                                style: TextStyle(
+                                  color: _branchColor(pillar[1]),
+                                ),
+                              ),
+                            ],
+                          ),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            nayin,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: _nayinColor(nayin),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (extras.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              extras.join('　·　'),
+              key: const Key('mini-cal-detail-extras'),
+              style: const TextStyle(
+                fontSize: 9,
+                color: _mutedInk,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ],
       ),
     );

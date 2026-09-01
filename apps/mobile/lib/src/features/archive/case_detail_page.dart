@@ -2,11 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:liuyao_engine/liuyao_engine.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../casting/casting_models.dart';
 import '../casting/chart_preview.dart';
+import '../../ui/design_system/design_system.dart';
 import '../../ui/liuyao_design.dart';
+import '../settings/app_preferences.dart';
 import 'archive_client.dart';
 import 'archive_image_export.dart';
 import 'archive_models.dart';
@@ -43,11 +46,11 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
   // 卦面标注显示状态（与十二长生表、卦面爻位标注联动）。
   String _growthReference = 'day';
   String _annotationMode = 'twelve_growth';
-  bool _showLineAnnotations = true;
   bool _showNaYin = true;
   bool _showTwelveGrowth = true;
   bool _showFiveStars = true;
   bool _show28Mansions = true;
+  bool _showAlmanacCalendar = false;
 
   /// 点击卦面爻位标注的十二长生/五星文字时弹出的参照选择器。
   Future<void> _openGrowthReferencePicker() async {
@@ -72,6 +75,12 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     super.initState();
     _detail = widget.initialDetail;
     _analysisController.text = _latestUserAnalysis?.body ?? '';
+    // 按设置页「卦面显示」偏好初始化标注默认值（卦面信息极大保留）。
+    final prefs = currentPreferences;
+    _showNaYin = prefs.showNayin;
+    _showFiveStars = prefs.showFiveStarsAndMansions;
+    _show28Mansions = prefs.showFiveStarsAndMansions;
+    _showTwelveGrowth = prefs.showShenshaAndTwelveGrowth;
   }
 
   CaseAnalysis? get _latestUserAnalysis {
@@ -84,6 +93,50 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
   Future<void> _refresh() async {
     final refreshed = await widget.client.getCase(_detail.id);
     if (mounted) setState(() => _detail = refreshed);
+  }
+
+  /// 删除档案：必须二次确认，防误删（2026-09-01 需求）。
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除这份档案？'),
+        content: Text(
+          '「${_detail.title}」及其卦面、解读与反馈将被永久删除，且无法恢复。',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('case-delete-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('再想想'),
+          ),
+          FilledButton(
+            key: const Key('case-delete-confirm'),
+            style: FilledButton.styleFrom(
+              backgroundColor: LiuyaoColors.cinnabar,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.client.deleteCase(_detail.id);
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败：$error')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('档案已删除')),
+    );
+    Navigator.pop(context);
   }
 
   Future<void> _saveAnalysis() async {
@@ -132,7 +185,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
           children: [
             const Text(
               '编辑背景问念',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -193,12 +246,28 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
 
   Future<void> _editTags() async {
     final tags = List<String>.from(_detail.tags);
+    // 打通档案页标签：聚合全部档案标签 + 自定义标签作为快速选用建议。
+    var suggestions = currentPreferences.customTags.toList();
+    try {
+      final summaries = await widget.client.listCases();
+      suggestions = {
+        ...suggestions,
+        for (final item in summaries) ...item.tags,
+      }.toList()
+        ..sort((a, b) => a.compareTo(b));
+    } on Object {
+      // 聚合失败仅意味着没有建议，不影响编辑。
+    }
+    if (!mounted) return;
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: _paper,
-      builder: (_) => _TagsEditor(initialTags: tags),
+      builder: (_) => _TagsEditor(
+        initialTags: tags,
+        suggestions: suggestions,
+      ),
     );
     if (result == null || !mounted) return;
     try {
@@ -267,7 +336,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
               children: [
                 const Text(
                   '导出完整档案',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 6),
                 const Text(
@@ -386,7 +455,11 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     final shensha = preview.annotations.shenshaResults;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('六爻卦面', key: Key('case-result-title')),
+        // 「道谕六爻」品牌标题统一组件（字体与档案页基准一致，AppBar 内字号略缩）。
+        title: const DaoyuBrandTitle(
+          keyOverride: Key('case-result-title'),
+          fontSize: 20,
+        ),
         actions: [
           if (widget.openedAfterCasting)
             const Padding(
@@ -407,6 +480,12 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
                   )
                 : const Icon(Icons.ios_share_rounded),
           ),
+          IconButton(
+            key: const Key('case-delete'),
+            tooltip: '删除档案',
+            onPressed: _confirmDelete,
+            icon: const Icon(Icons.delete_outline_rounded),
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -424,12 +503,16 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             onEditTags: _editTags,
           ),
           const SizedBox(height: 10),
-          if (preview.castingRecord.method == 'three_coins') ...[
-            _ResultExpansionCard(
-              key: const Key('result-casting-record-section'),
-              title: '起卦记录',
-              summary: '自动铜钱 · 六次原始记录已存档',
-              child: _CastingRecordPanel(record: preview.castingRecord),
+          if (currentPreferences.showCastingRecord &&
+              preview.castingRecord.method == 'three_coins') ...[
+            DSReveal(
+              delay: const Duration(milliseconds: 60),
+              child: _ResultExpansionCard(
+                key: const Key('result-casting-record-section'),
+                title: '起卦记录',
+                summary: '自动铜钱 · 六次原始记录已存档',
+                child: _CastingRecordPanel(record: preview.castingRecord),
+              ),
             ),
             const SizedBox(height: 10),
           ],
@@ -437,7 +520,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             _ResultExpansionCard(
               key: const Key('result-twelve-section'),
               title: '十二长生',
-              summary: '五行体系 · ${twelveStages.length} 爻 × 四柱',
+              summary: _twelveStageSummary(preview.dayPillar),
               child: LiuyaoTwelveStagesPanel(
                 preview: preview,
                 selectedReference: _growthReference,
@@ -461,56 +544,70 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             ),
             const SizedBox(height: 12),
           ],
-          Container(
-            key: const Key('result-chart-card'),
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(LiuyaoRadii.large),
-            ),
-            child: LiuyaoCoreChart(
-              preview: preview,
-              lightHeader: true,
-              showSummaryHeader: false,
-              growthReference: _growthReference,
-              annotationMode: _annotationMode,
-              onGrowthTap: _openGrowthReferencePicker,
-              visibility: LiuyaoLineAnnotationVisibility(
-                showNaYin: _showLineAnnotations && _showNaYin,
-                showTwelveGrowth: _showLineAnnotations && _showTwelveGrowth,
-                showFiveStars: _showLineAnnotations && _showFiveStars,
-                show28Mansions: _showLineAnnotations && _show28Mansions,
+          DSScaleIn(
+            child: Container(
+              key: const Key('result-chart-card'),
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(LiuyaoRadii.card),
+              ),
+              child: LiuyaoCoreChart(
+                preview: preview,
+                lightHeader: true,
+                showSummaryHeader: false,
+                growthReference: _growthReference,
+                annotationMode: _annotationMode,
+                onGrowthTap: _openGrowthReferencePicker,
+                visibility: LiuyaoLineAnnotationVisibility(
+                  showNaYin: _showNaYin,
+                  showTwelveGrowth: _showTwelveGrowth,
+                  showFiveStars: _showFiveStars,
+                  show28Mansions: _show28Mansions,
+                ),
+                footer: Column(
+                  children: [
+                    LiuyaoLineAnnotationsToggle(
+                      showNaYin: _showNaYin,
+                      onChangedNaYin: (value) =>
+                          setState(() => _showNaYin = value),
+                      showTwelveGrowth: _showTwelveGrowth,
+                      onChangedTwelveGrowth: (value) {
+                        setState(() => _showTwelveGrowth = value);
+                      },
+                      showFiveStars: _showFiveStars,
+                      onChangedFiveStars: (value) {
+                        setState(() => _showFiveStars = value);
+                      },
+                      show28Mansions: _show28Mansions,
+                      onChanged28Mansions: (value) {
+                        setState(() => _show28Mansions = value);
+                      },
+                      showAlmanacCalendar: _showAlmanacCalendar,
+                      onToggleAlmanacCalendar: () => setState(
+                        () => _showAlmanacCalendar = !_showAlmanacCalendar,
+                      ),
+                    ),
+                    if (_showAlmanacCalendar)
+                      LiuyaoMiniAlmanacCalendar(
+                        initialMonth: _detail.castAt,
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          LiuyaoLineAnnotationsToggle(
-            showLineAnnotations: _showLineAnnotations,
-            onChangedLineAnnotations: (value) {
-              setState(() => _showLineAnnotations = value);
-            },
-            showNaYin: _showNaYin,
-            onChangedNaYin: (value) => setState(() => _showNaYin = value),
-            showTwelveGrowth: _showTwelveGrowth,
-            onChangedTwelveGrowth: (value) {
-              setState(() => _showTwelveGrowth = value);
-            },
-            showFiveStars: _showFiveStars,
-            onChangedFiveStars: (value) {
-              setState(() => _showFiveStars = value);
-            },
-            show28Mansions: _show28Mansions,
-            onChanged28Mansions: (value) {
-              setState(() => _show28Mansions = value);
-            },
-          ),
-          const SizedBox(height: 10),
-          if (preview.calculationTrace.isNotEmpty) ...[
-            _ResultExpansionCard(
-              key: const Key('result-calculation-section'),
-              title: '计算依据',
-              summary: '${preview.calculationTrace.length} 组规则过程可核对',
-              child: LiuyaoCalculationDetailsPanel(preview: preview),
+          const SizedBox(height: 8),
+          if (currentPreferences.showCalculationBasis &&
+              preview.calculationTrace.isNotEmpty) ...[
+            DSReveal(
+              delay: const Duration(milliseconds: 120),
+              child: _ResultExpansionCard(
+                key: const Key('result-calculation-section'),
+                title: '计算依据',
+                summary: '${preview.calculationTrace.length} 组规则过程可核对',
+                child: LiuyaoCalculationDetailsPanel(preview: preview),
+              ),
             ),
             const SizedBox(height: 10),
           ],
@@ -534,7 +631,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _ResultExpansionCard(
             key: const Key('result-feedback-section'),
             title: '反馈信息',
@@ -565,12 +662,25 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              '— 仅供娱乐 —',
+              key: const Key('case-entertainment-note'),
+              style: const TextStyle(
+                color: _mutedInk,
+                fontSize: 12,
+                letterSpacing: 2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           if (_error != null) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFEDEA),
+                color: DSColors.glowCinnabar,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(_error!, style: const TextStyle(color: _cinnabar)),
@@ -588,6 +698,37 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             '${item.displayName}-${item.targetBranches.isEmpty ? '—' : item.targetBranches.join('、')}',
       )
       .join('  ');
+
+  /// 十二长生折叠摘要：以日支为主体列四阶段（长生/帝旺/墓/绝）所在支，
+  /// 对齐线框图「十二：长生-寅 帝旺-午 墓-戌 绝-亥」形态。
+  /// 日支为辰戌丑未时走《五行大义》四土独立表（受气→绝），否则走五行顺行表。
+  String _twelveStageSummary(String dayPillar) {
+    const branches = '子丑寅卯辰巳午未申酉戌亥';
+    if (dayPillar.length < 2) return '五行体系 · 无记录';
+    final dayBranch = dayPillar[1];
+    const wanted = ['长生', '帝旺', '墓', '绝'];
+    final parts = <String>[];
+    for (final stage in wanted) {
+      final hits = <String>[];
+      for (final branch in branches.split('')) {
+        final growth = lookupPrivateBranchGrowth(dayBranch, branch);
+        final display = (growth['display_phases'] as List).cast<String>();
+        if (display.contains(stage)) hits.add(branch);
+      }
+      if (hits.isEmpty) continue;
+      // 四土「受气」跨两支（主体+4 / 主体+5），按《五行大义》原文先列主体+4 支。
+      final dayIndex = branches.indexOf(dayBranch);
+      final first = hits.length == 1
+          ? hits.first
+          : hits.firstWhere(
+              (b) => (branches.indexOf(b) - dayIndex + 12) % 12 == 4,
+              orElse: () => hits.first,
+            );
+      parts.add('$stage-$first');
+    }
+    if (parts.isEmpty) return '五行体系 · 日支$dayBranch';
+    return '十二：${parts.join('  ')}';
+  }
 
   String _message(Object error) =>
       error.toString().replaceFirst(RegExp(r'^.*Exception: '), '');
@@ -671,7 +812,10 @@ class _QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(16, 14, 16, 13),
+    // 与线框图 CaseInfo 对齐：整卡压成两行主信息（日期 / 占问），
+    // 问念与标签折叠为第三行小字；取卦方式与编辑入口全部行内化，
+    // 不再单独占层，schema 版本仅保留在导出与持久化数据中。
+    padding: const EdgeInsets.fromLTRB(9, 4, 5, 4),
     decoration: BoxDecoration(
       color: _paper,
       borderRadius: BorderRadius.circular(LiuyaoRadii.card),
@@ -681,7 +825,7 @@ class _QuestionCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Text.rich(
@@ -689,18 +833,46 @@ class _QuestionCard extends StatelessWidget {
                   children: [
                     const TextSpan(
                       text: '日期：',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     TextSpan(text: _dateTime(detail.castAt)),
                   ],
                 ),
-                style: const TextStyle(fontSize: 13, height: 1.45),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10.5, height: 1.15),
               ),
+            ),
+            Text(
+              switch (detail.castingMethod) {
+                'manual' => '手动起卦',
+                'time_pillar' => '时刻起卦',
+                _ => '自动铜钱',
+              },
+              style: const TextStyle(
+                color: _cinnabar,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            IconButton(
+              key: const Key('edit-tags'),
+              tooltip: '编辑标签',
+              onPressed: onEditTags,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 20, height: 20),
+              padding: EdgeInsets.zero,
+              iconSize: 13,
+              icon: const Icon(Icons.sell_outlined, color: _cinnabar),
             ),
             IconButton(
               key: const Key('edit-question-context'),
               tooltip: '编辑背景问念',
               onPressed: onEdit,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 20, height: 20),
+              padding: EdgeInsets.zero,
+              iconSize: 14,
               icon: const Icon(Icons.edit_note_outlined, color: _cinnabar),
             ),
           ],
@@ -711,103 +883,93 @@ class _QuestionCard extends StatelessWidget {
             children: [
               const TextSpan(
                 text: '占问：',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
               TextSpan(text: detail.question),
             ],
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: LiuyaoColors.ink,
-            fontSize: 16,
-            height: 1.45,
+            fontSize: 12,
+            height: 1.18,
             fontWeight: FontWeight.w600,
           ),
         ),
-        if (detail.questionContext.trim().isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            '背景问念：${detail.questionContext}',
-            style: const TextStyle(
-              color: _mutedInk,
-              fontSize: 12,
-              height: 1.45,
-            ),
-          ),
-        ],
-        if (detail.tags.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
+        if (detail.questionContext.trim().isNotEmpty ||
+            detail.tags.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              for (final tag in detail.tags)
-                Container(
-                  key: Key('detail-tag-$tag'),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _cinnabar.withValues(alpha: .1),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: _cinnabar.withValues(alpha: .35),
+              if (detail.questionContext.trim().isNotEmpty)
+                Expanded(
+                  child: Text(
+                    '背景问念：${detail.questionContext}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _mutedInk,
+                      fontSize: 9,
+                      height: 1.15,
                     ),
                   ),
-                  child: Text(
-                    tag,
-                    style: const TextStyle(
-                      color: _cinnabar,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                )
+              else
+                const Spacer(),
+              if (detail.tags.isNotEmpty) ...[
+                if (detail.questionContext.trim().isNotEmpty)
+                  const SizedBox(width: 5),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 128),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final tag in detail.tags)
+                          Container(
+                            key: Key('detail-tag-$tag'),
+                            margin: const EdgeInsets.only(left: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _cinnabar.withValues(alpha: .08),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: _cinnabar.withValues(alpha: .28),
+                              ),
+                            ),
+                            child: Text(
+                              tag,
+                              style: const TextStyle(
+                                color: _cinnabar,
+                                fontSize: 9,
+                                height: 1.15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         ],
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Text(
-              detail.castingMethod == 'manual' ? '手动起卦' : '自动铜钱',
-              style: const TextStyle(color: _cinnabar, fontSize: 11),
-            ),
-            const Text('  ·  ', style: TextStyle(color: _mutedInk)),
-            Text(
-              'schema v${detail.chart.schemaVersion}',
-              style: const TextStyle(color: _mutedInk, fontSize: 11),
-            ),
-            const Spacer(),
-            InkWell(
-              key: const Key('edit-tags'),
-              onTap: onEditTags,
-              borderRadius: BorderRadius.circular(8),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.sell_outlined,
-                        color: _cinnabar, size: 14),
-                    SizedBox(width: 4),
-                    Text(
-                      '标签',
-                      style: TextStyle(color: _cinnabar, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ],
     ),
   );
 
   static String _dateTime(DateTime value) =>
-      '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')} '
-      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+      '${value.year}年${value.month.toString().padLeft(2, '0')}月'
+      '${value.day.toString().padLeft(2, '0')}日 '
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}:'
+      '${value.second.toString().padLeft(2, '0')}';
 }
 
 class _AutoArchiveBanner extends StatelessWidget {
@@ -818,21 +980,21 @@ class _AutoArchiveBanner extends StatelessWidget {
     key: const Key('auto-archive-banner'),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
     decoration: BoxDecoration(
-      color: const Color(0xFFEAF3EA),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0x334F7A54)),
+      color: DSColors.glowJade,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: DSColors.jade.withValues(alpha: .3)),
     ),
     child: const Row(
       children: [
-        Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF4F7A54)),
+        Icon(Icons.inventory_2_outlined, size: 18, color: DSColors.jade),
         SizedBox(width: 8),
         Expanded(
           child: Text(
             '排盘完成，当前原始起卦与完整卦面已自动存入档案',
             style: TextStyle(
-              color: Color(0xFF365D3B),
+              color: DSColors.jade,
               fontSize: 11,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -854,39 +1016,46 @@ class _ResultExpansionCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: _paper,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-      side: const BorderSide(color: _rule, width: .8),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: ExpansionTile(
-      maintainState: true,
-      tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-      shape: const Border(),
-      collapsedShape: const Border(),
-      title: Row(
-        children: [
-          Text(
-            '$title：',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              summary,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: _mutedInk, fontSize: 12),
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return DSGlassPanel(
+      padding: EdgeInsets.zero,
+      color: DSColors.glass,
+      child: ExpansionTile(
+        maintainState: true,
+        expansionAnimationStyle: reduceMotion
+            ? const AnimationStyle(duration: Duration.zero)
+            : const AnimationStyle(duration: Duration(milliseconds: 220)),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        iconColor: DSColors.celadonDeep,
+        collapsedIconColor: DSColors.textMuted,
+        title: Row(
+          children: [
+            Text(
+              '$title：',
+              style: DSTypography.displayLight(
+                fontSize: 14,
+                weight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 3),
+            Expanded(
+              child: Text(
+                summary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: _mutedInk, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+        children: [child],
       ),
-      children: [child],
-    ),
-  );
+    );
+  }
 }
 
 class _CastingRecordPanel extends StatelessWidget {
@@ -903,7 +1072,9 @@ class _CastingRecordPanel extends StatelessWidget {
           margin: const EdgeInsets.only(top: 7),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
-            color: line.changing ? const Color(0xFFF8E8DF) : _softPaper,
+            color: line.changing
+                ? DSColors.cinnabar.withValues(alpha: .12)
+                : _softPaper,
             borderRadius: BorderRadius.circular(13),
           ),
           child: Row(
@@ -912,7 +1083,7 @@ class _CastingRecordPanel extends StatelessWidget {
                 width: 40,
                 child: Text(
                   line.positionName,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               ...line.coins.map(
@@ -933,7 +1104,7 @@ class _CastingRecordPanel extends StatelessWidget {
                 style: TextStyle(
                   color: line.changing ? _cinnabar : _mutedInk,
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -961,14 +1132,14 @@ class _ResultCoin extends StatelessWidget {
     alignment: Alignment.center,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: value == 3 ? const Color(0xFF251D18) : const Color(0xFFE4D3BC),
+      color: value == 3 ? LiuyaoColors.ink : LiuyaoColors.parchment,
     ),
     child: Text(
       '$value',
       style: TextStyle(
-        color: value == 3 ? Colors.white : const Color(0xFF251D18),
+        color: value == 3 ? LiuyaoColors.paper : LiuyaoColors.ink,
         fontSize: 10,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
       ),
     ),
   );
@@ -990,7 +1161,7 @@ class _AnalysisEditor extends StatelessWidget {
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: _paper,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(12),
       border: Border.all(color: _rule),
     ),
     child: Column(
@@ -1042,7 +1213,7 @@ class _AnalysisHistory extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Material(
     color: _softPaper,
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(12),
     clipBehavior: Clip.antiAlias,
     child: ExpansionTile(
       key: const Key('analysis-history'),
@@ -1076,14 +1247,14 @@ class _EmptyFeedback extends StatelessWidget {
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
       color: _paper,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(12),
       border: Border.all(color: _rule),
     ),
     child: Column(
       children: [
         const Icon(Icons.timeline_rounded, color: _cinnabar, size: 30),
         const SizedBox(height: 8),
-        const Text('还没有事后反馈', style: TextStyle(fontWeight: FontWeight.w800)),
+        const Text('还没有事后反馈', style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 5),
         const Text(
           '事情有进展时回来记录，用于长期复盘。',
@@ -1113,7 +1284,7 @@ class _FeedbackCard extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
     decoration: BoxDecoration(
       color: _paper,
-      borderRadius: BorderRadius.circular(17),
+      borderRadius: BorderRadius.circular(12),
       border: Border.all(color: _rule),
     ),
     child: Row(
@@ -1138,7 +1309,7 @@ class _FeedbackCard extends StatelessWidget {
                 style: const TextStyle(
                   color: _cinnabar,
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 5),
@@ -1236,7 +1407,7 @@ class _FeedbackEditorState extends State<_FeedbackEditor> {
       children: [
         Text(
           widget.existing == null ? '添加反馈' : '编辑反馈',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 14),
         DropdownButtonFormField<String>(
@@ -1287,7 +1458,7 @@ class _FeedbackEditorState extends State<_FeedbackEditor> {
         FilledButton.icon(
           key: const Key('save-feedback'),
           onPressed: _submit,
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
           icon: const Icon(Icons.save_outlined),
           label: Text(widget.existing == null ? '保存反馈' : '保存修改'),
         ),
@@ -1305,9 +1476,12 @@ String _statusLabel(String status) => switch (status) {
 
 /// 档案标签管理弹窗：查看、添加、删除标签。
 class _TagsEditor extends StatefulWidget {
-  const _TagsEditor({required this.initialTags});
+  const _TagsEditor({required this.initialTags, this.suggestions = const []});
 
   final List<String> initialTags;
+
+  /// 快速选用建议：全部档案标签 + 档案页「＋」新建的自定义标签。
+  final List<String> suggestions;
 
   @override
   State<_TagsEditor> createState() => _TagsEditorState();
@@ -1317,6 +1491,11 @@ class _TagsEditorState extends State<_TagsEditor> {
   late final List<String> _tags = List<String>.from(widget.initialTags);
   final _controller = TextEditingController();
   String? _error;
+
+  /// 未选用的建议（已选中的不再重复出现）。
+  late List<String> _suggestions = widget.suggestions
+      .where((tag) => !_tags.contains(tag))
+      .toList();
 
   @override
   void dispose() {
@@ -1350,7 +1529,22 @@ class _TagsEditorState extends State<_TagsEditor> {
   }
 
   void _remove(String tag) {
-    setState(() => _tags.remove(tag));
+    setState(() {
+      _tags.remove(tag);
+      if (widget.suggestions.contains(tag)) {
+        _suggestions = [..._suggestions, tag]..sort();
+      }
+    });
+  }
+
+  /// 快速选用：点选建议标签直接加入当前卦例。
+  void _addSuggestion(String tag) {
+    setState(() {
+      if (_tags.contains(tag)) return;
+      _tags.add(tag);
+      _suggestions.remove(tag);
+      _error = null;
+    });
   }
 
   @override
@@ -1368,7 +1562,7 @@ class _TagsEditorState extends State<_TagsEditor> {
         children: [
           const Text(
             '编辑标签',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           const Text(
@@ -1386,11 +1580,10 @@ class _TagsEditorState extends State<_TagsEditor> {
                     key: Key('tag-chip-$tag'),
                     label: Text(tag),
                     onDeleted: () => _remove(tag),
+                    deleteButtonTooltipMessage: '删除',
                     deleteIconColor: _cinnabar,
-                    backgroundColor: _cinnabar.withValues(alpha: .08),
-                    side: BorderSide(
-                      color: _cinnabar.withValues(alpha: .35),
-                    ),
+                    backgroundColor: LiuyaoColors.jade.withValues(alpha: .08),
+                    side: BorderSide(color: _cinnabar.withValues(alpha: .35)),
                     labelStyle: TextStyle(
                       color: LiuyaoColors.ink,
                       fontSize: 13,
@@ -1439,6 +1632,30 @@ class _TagsEditorState extends State<_TagsEditor> {
               style: const TextStyle(color: _cinnabar, fontSize: 12),
             ),
           ],
+          // 快速选用：档案页「＋」新建的自定义标签与已有档案标签，
+          // 点选即加入当前卦例，免去重复输入。
+          if (_suggestions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text(
+              '快速选用',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final tag in _suggestions)
+                  ActionChip(
+                    key: Key('tag-suggest-$tag'),
+                    label: Text(tag, style: const TextStyle(fontSize: 12)),
+                    onPressed: () => _addSuggestion(tag),
+                    backgroundColor: _paper,
+                    side: const BorderSide(color: _rule),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -1452,7 +1669,7 @@ class _TagsEditorState extends State<_TagsEditor> {
                 key: const Key('save-tags'),
                 onPressed: () => Navigator.pop(context, _tags),
                 style: FilledButton.styleFrom(
-                  backgroundColor: _cinnabar,
+                  backgroundColor: LiuyaoColors.jade,
                 ),
                 child: const Text('保存'),
               ),

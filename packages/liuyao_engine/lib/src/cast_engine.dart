@@ -76,20 +76,24 @@ Map<String, dynamic> _castingRecordManual(List<int> lines) {
 
 /// 时刻起卦法的爻值（6/7/8/9）与原始输入。
 ///
-/// 依据附件《时刻起卦法详解(1)》（用户 2026-08-20 确认）：
-/// 1. 时刻重划：一时辰 120 分钟，十二均分，每刻十分钟。
-///    时辰内 0-9 分为子刻、10-19 为丑刻，依此类推。
-/// 2. 时刻干支：时柱天干按五鼠遁（日上起子时）；刻柱天干从时干起子刻
-///    （时上起子刻），依六十甲子顺推到刻支。
-/// 3. 本卦：时支后天八卦为内卦（下卦），刻支后天八卦为外卦（上卦）。
-/// 4. 动爻：时柱天干序数 + 刻柱天干序数 之和 mod 6，余 0 则上爻（天爻）动。
+/// 时刻起卦法 2.0（用户 2026-09-01 确认，替代 1.0）：
+/// 1.0 的缺陷：内卦取时支后天八卦，而人类活动时间集中在 7-23 点，
+/// 导致内卦为巽/坤/乾的概率过大。2.0 改为：
+/// 1. 念头起时锁定时刻干支：时柱依万年历（日上起子时五鼠遁）；
+///    刻柱按时上起刻法推算——一时辰 120 分钟十二均分，每刻十分钟，
+///    刻干从时干起子刻，依六十甲子顺推到刻支。
+/// 2. 本卦：刻柱天干按六爻纳甲翻卦为内卦（下卦）——
+///    甲壬乾、乙癸坤、丙艮、丁兑、戊坎、己离、庚震、辛巽；
+///    刻柱地支按后天方位翻卦为外卦（上卦）——
+///    子坎、丑寅艮、卯震、辰巳巽、午离、未申坤、酉兑、戌亥乾。
+/// 3. 动爻：日柱天干序数 + 时柱天干序数 之和 mod 6，余 0 则上爻（天爻）动。
 /// 动爻处取老变（阳动 9 / 阴动 6），其余取少阳 7 / 少阴 8。
 ({List<int> lines, Map<String, dynamic> rawInput}) _computeTimePillar(
   DateTime timestamp,
   Map<String, dynamic> almanac,
 ) {
   const branches = '子丑寅卯辰巳午未申酉戌亥';
-  // 地支 → 后天八卦（附件第二步）。
+  // 地支 → 后天八卦（外卦，取刻支）。
   const branchTrigram = {
     '子': '坎',
     '丑': '艮',
@@ -103,6 +107,20 @@ Map<String, dynamic> _castingRecordManual(List<int> lines) {
     '酉': '兑',
     '戌': '乾',
     '亥': '乾',
+  };
+  // 天干 → 纳甲八卦（内卦，取刻干）。六爻纳甲：
+  // 乾纳甲壬、坤纳乙癸、艮纳丙、兑纳丁、坎纳戊、离纳己、震纳庚、巽纳辛。
+  const stemTrigram = {
+    '甲': '乾',
+    '乙': '坤',
+    '丙': '艮',
+    '丁': '兑',
+    '戊': '坎',
+    '己': '离',
+    '庚': '震',
+    '辛': '巽',
+    '壬': '乾',
+    '癸': '坤',
   };
   // 后天八卦 → 卦象位（1 阳 0 阴，自下而上）。
   const trigramBits = {
@@ -153,16 +171,17 @@ Map<String, dynamic> _castingRecordManual(List<int> lines) {
   final kePillar = the60HeavenlyEarth[keCycleIndex];
   final keStem = kePillar[0];
 
-  // 4. 本卦：时支后天八卦为内卦（下），刻支后天八卦为外卦（上）。
-  final innerTrigram = branchTrigram[hourBranch]!;
+  // 4. 本卦（2.0）：刻干纳甲翻卦为内卦（下），刻支后天方位翻卦为外卦（上）。
+  final innerTrigram = stemTrigram[keStem]!;
   final outerTrigram = branchTrigram[keBranch]!;
   final bits = [...trigramBits[innerTrigram]!, ...trigramBits[outerTrigram]!];
   final hexagramName = gua64[bits.join('')] ?? '未知卦';
 
-  // 5. 动爻：时干序 + 刻干序 之和 mod 6，余 0 取上爻（天爻）。
+  // 5. 动爻（2.0）：日干序 + 时干序 之和 mod 6，余 0 取上爻（天爻）。
+  final dayStemOrdinal = stemOrdinals[dayPillar[0]]!;
   final hourStemOrdinal = stemOrdinals[hourPillar[0]]!;
   final keStemOrdinal = stemOrdinals[keStem]!;
-  final movingSum = hourStemOrdinal + keStemOrdinal;
+  final movingSum = dayStemOrdinal + hourStemOrdinal;
   final moving = movingSum % 6;
   final movingPosition = moving == 0 ? 6 : moving;
 
@@ -173,16 +192,20 @@ Map<String, dynamic> _castingRecordManual(List<int> lines) {
   });
   final rawInput = <String, dynamic>{
     'day_pillar': dayPillar,
+    'day_stem_ordinal': dayStemOrdinal,
     'hour_pillar': hourPillar,
     'hour_branch': hourBranch,
     'hour_stem_ordinal': hourStemOrdinal,
     'ke_pillar': kePillar,
     'ke_stem': keStem,
+    'ke_stem_ordinal': keStemOrdinal,
     'ke_branch': keBranch,
     'ke_branch_index': keBranchIndex,
     'minute_offset_in_shichen': offsetMinutes,
-    'inner_trigram': innerTrigram, // 内卦（下卦）
-    'outer_trigram': outerTrigram, // 外卦（上卦）
+    'inner_trigram': innerTrigram, // 内卦（下卦，2.0 取刻干纳甲）
+    'inner_trigram_source': 'ke_stem_najia',
+    'outer_trigram': outerTrigram, // 外卦（上卦，取刻支后天方位）
+    'outer_trigram_source': 'ke_branch_houtian',
     'moving_sum': movingSum,
     'moving': moving,
     'moving_position': movingPosition,
@@ -200,7 +223,7 @@ Map<String, dynamic> _castingRecordTimePillar(
 ) {
   return {
     'method': 'time_pillar',
-    'method_version': 'time_pillar.shichen_ke_houtian.v1',
+    'method_version': 'time_pillar.ke_gan_najia.v2',
     'line_order': 'bottom_to_top',
     'line_values': lines,
     'raw_input': rawInput,
@@ -285,12 +308,12 @@ Map<String, dynamic> _castingTrace(Map<String, dynamic> record) {
   } else if (record['method'] == 'time_pillar') {
     final raw = record['raw_input'] as Map<String, dynamic>;
     final steps = [
-      '时刻起卦法：${raw['day_pillar']}日 ${raw['hour_pillar']}时 ${raw['ke_pillar']}刻'
-          '（时干${raw['hour_stem_ordinal']}、刻干${raw['ke_stem_ordinal']}）',
-      '本卦内卦取时支 ${raw['hour_branch']} 后天八卦为 ${raw['inner_trigram']}，'
-          '外卦取刻支 ${raw['ke_branch']} 后天八卦为 ${raw['outer_trigram']}',
+      '时刻起卦法2.0：${raw['day_pillar']}日 ${raw['hour_pillar']}时 ${raw['ke_pillar']}刻'
+          '（念头起时锁定时刻干支）',
+      '内卦取刻干 ${raw['ke_stem']} 纳甲翻卦为 ${raw['inner_trigram']}，'
+          '外卦取刻支 ${raw['ke_branch']} 后天方位翻卦为 ${raw['outer_trigram']}',
       '卦象 ${raw['bits']} → 本卦 ${raw['hexagram_name']}',
-      '动爻 =（时干序 ${raw['hour_stem_ordinal']} + 刻干序 ${raw['ke_stem_ordinal']}）'
+      '动爻 =（日干序 ${raw['day_stem_ordinal']} + 时干序 ${raw['hour_stem_ordinal']}）'
           'mod 6 = ${raw['moving']}，余 0 取上爻 → '
           '${raw['moving_position_name']}动',
       ...(record['lines'] as List).map((line) {
@@ -299,13 +322,13 @@ Map<String, dynamic> _castingTrace(Map<String, dynamic> record) {
     ];
 
     return {
-      'rule_id': 'casting.time_pillar.shichen_ke_houtian.v1',
+      'rule_id': 'casting.time_pillar.ke_gan_najia.v2',
       'label': '时刻起卦法原始过程',
       'scope': 'casting',
       'inputs': raw,
       'steps': steps,
       'result': record['line_values'],
-      'rule_version': '1.0.0',
+      'rule_version': '2.0.0',
     };
   } else {
     final steps = (record['lines'] as List).map((line) {

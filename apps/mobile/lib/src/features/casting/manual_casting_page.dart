@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:liuyao_engine/liuyao_engine.dart' as engine;
 
+import '../../ui/design_system/tokens/ds_colors.dart';
 import '../../ui/liuyao_design.dart';
 import '../archive/archive_client.dart';
 import '../archive/case_detail_page.dart';
+import '../settings/app_preferences.dart';
 import 'casting_client.dart';
 import 'casting_models.dart';
 
@@ -45,6 +47,14 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
   String? _error;
   String _dayBoundary = engine.dayBoundaryCivil23NextDay;
   String _monthBoundary = engine.monthBoundarySolarTermZiHour;
+
+  /// 全局历法口径：进入页面时从偏好读取（首次弹窗 / 设置页统一维护）。
+  void _syncCalendarPolicyFromPreferences() {
+    final prefs = currentPreferences;
+    _dayBoundary = prefs.dayBoundaryStrategy;
+    _monthBoundary = prefs.monthBoundaryStrategy;
+  }
+
   String _fourPillarsSource = 'calculated';
   ManualFourPillars _manualFourPillars = const ManualFourPillars(
     yearGan: '甲',
@@ -72,6 +82,14 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
       initial.hour,
       initial.minute,
     );
+    _syncCalendarPolicyFromPreferences();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 从档案详情/设置页返回时刷新全局口径。
+    _syncCalendarPolicyFromPreferences();
   }
 
   List<int> get _lineValues =>
@@ -164,15 +182,13 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
   }
 
   Future<void> _reviewAndSubmit() async {
-    final question = _questionController.text.trim();
-    if (question.isEmpty) {
-      setState(() => _error = '请先填写占问事项');
-      return;
-    }
-    if (question.length > 1000) {
+    // 问念可空（2026-09-01 需求）：留空时默认「暂无问念」。
+    final rawQuestion = _questionController.text.trim();
+    if (rawQuestion.length > 1000) {
       setState(() => _error = '占问事项不能超过 1000 字');
       return;
     }
+    final question = rawQuestion.isEmpty ? '暂无问念' : rawQuestion;
     if (_fourPillarsSource == 'manual' && !_manualFourPillars.isComplete) {
       setState(() => _error = '手动四柱需填齐四柱的天干地支');
       return;
@@ -249,15 +265,14 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
           key: const Key('manual-casting-scroll'),
           padding: const EdgeInsets.fromLTRB(14, 20, 14, 28),
           children: [
-            _buildHeader(),
-            const SizedBox(height: 18),
             _buildQuestion(),
             const SizedBox(height: 12),
             _buildDateTime(),
-            const SizedBox(height: 14),
-            _buildCalendarPolicy(),
-            const SizedBox(height: 14),
-            _buildFourPillars(),
+            // 历法口径首次选择完成后由设置页统一管理，起卦页不再显示该卡片。
+            if (!currentPreferences.calendarPolicySetupCompleted) ...[
+              const SizedBox(height: 12),
+              _buildCalendarPolicy(),
+            ],
             const SizedBox(height: 18),
             _buildEditorHeader(),
             const SizedBox(height: 10),
@@ -274,56 +289,6 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '六爻',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: _cinnabar,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 3,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '手动起卦',
-                key: const Key('manual-casting-title'),
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  color: _ink,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text('先定本爻阴阳，再独立标记动爻', style: TextStyle(color: _mutedInk)),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _ink,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: const Text(
-            '手动模式',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildQuestion() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -336,7 +301,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
         maxLength: 1000,
         decoration: const InputDecoration(
           labelText: '占问事项',
-          hintText: '写清楚对象、背景和想确认的问题',
+          hintText: '可不填，留空记为「暂无问念」；写清楚对象与背景更好',
           border: InputBorder.none,
           counterText: '',
         ),
@@ -348,186 +313,174 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
   }
 
   Widget _buildDateTime() {
+    // 与四柱来源合并为一张卡：自动计算时显示日期时间，手动填写时只显示四柱编辑器。
+    final isCalculated = _fourPillarsSource == 'calculated';
     return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          Expanded(
-            child: _DateTimeButton(
-              key: const Key('casting-date'),
-              icon: Icons.calendar_today_outlined,
-              label: '日期',
-              value:
-                  '${_dateTime.year}-${_two(_dateTime.month)}-${_two(_dateTime.day)}',
-              onTap: _pickDate,
-            ),
-          ),
-          Container(width: 1, height: 44, color: _rule),
-          Expanded(
-            child: _DateTimeButton(
-              key: const Key('casting-time'),
-              icon: Icons.schedule_outlined,
-              label: '北京时间',
-              value: '${_two(_dateTime.hour)}:${_two(_dateTime.minute)}',
-              onTap: _pickTime,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendarPolicy() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '历法口径',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            '交日、交月按你指定的口径计算，并随档案保存',
-            style: TextStyle(color: _mutedInk, fontSize: 10),
-          ),
-          const SizedBox(height: 10),
-          Text('交日', style: const TextStyle(color: _mutedInk, fontSize: 11)),
-          const SizedBox(height: 4),
-          SegmentedButton<String>(
-            key: const Key('day-boundary-selector'),
-            segments: [
-              ButtonSegment(
-                value: engine.dayBoundaryCivil23NextDay,
-                label: const Text('过23点换日'),
+          Row(
+            children: [
+              const Text(
+                '起卦时间',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
-              ButtonSegment(
-                value: engine.dayBoundaryAstronomicalMidnight,
-                label: const Text('子正0点换日'),
-              ),
-            ],
-            selected: {_dayBoundary},
-            showSelectedIcon: false,
-            style: _selectorStyle(),
-            onSelectionChanged: (selection) {
-              setState(() => _dayBoundary = selection.first);
-            },
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _dayBoundary == engine.dayBoundaryCivil23NextDay
-                ? '23:00:00.001 起进入当日子时，日柱按次日算'
-                : '0 点换日，23:00–23:59 夜子时用当日日柱',
-            style: const TextStyle(color: _mutedInk, fontSize: 9, height: 1.4),
-          ),
-          const SizedBox(height: 10),
-          Text('交月', style: const TextStyle(color: _mutedInk, fontSize: 11)),
-          const SizedBox(height: 4),
-          SegmentedButton<String>(
-            key: const Key('month-boundary-selector'),
-            segments: [
-              ButtonSegment(
-                value: engine.monthBoundarySolarTermZiHour,
-                label: const Text('节气子时换月'),
-              ),
-              ButtonSegment(
-                value: engine.monthBoundaryAstronomicalMoment,
-                label: const Text('精确时刻换月'),
+              const Spacer(),
+              SegmentedButton<String>(
+                key: const Key('four-pillars-source'),
+                segments: const [
+                  ButtonSegment(
+                    value: 'calculated',
+                    icon: Icon(Icons.auto_awesome_outlined, size: 14),
+                    label: Text('自动计算', style: TextStyle(fontSize: 11)),
+                  ),
+                  ButtonSegment(
+                    value: 'manual',
+                    icon: Icon(Icons.edit_outlined, size: 14),
+                    label: Text('手动填写', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+                selected: {_fourPillarsSource},
+                showSelectedIcon: false,
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  side: const WidgetStatePropertyAll(BorderSide(color: _cinnabar)),
+                  backgroundColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? _cinnabar
+                        : _softPaper,
+                  ),
+                  foregroundColor: WidgetStateProperty.resolveWith(
+                    (states) =>
+                        states.contains(WidgetState.selected) ? Colors.white : _ink,
+                  ),
+                ),
+                onSelectionChanged: (selection) {
+                  setState(() => _fourPillarsSource = selection.first);
+                },
               ),
             ],
-            selected: {_monthBoundary},
-            showSelectedIcon: false,
-            style: _selectorStyle(),
-            onSelectionChanged: (selection) {
-              setState(() => _monthBoundary = selection.first);
-            },
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _monthBoundary == engine.monthBoundarySolarTermZiHour
-                ? '进入当月节气的子时即换月柱'
-                : '按节气天文精确时刻切换月柱',
-            style: const TextStyle(color: _mutedInk, fontSize: 9, height: 1.4),
-          ),
-        ],
-      ),
-    );
-  }
-
-  ButtonStyle _selectorStyle() {
-    return ButtonStyle(
-      visualDensity: VisualDensity.compact,
-      side: const WidgetStatePropertyAll(BorderSide(color: _cinnabar)),
-      backgroundColor: WidgetStateProperty.resolveWith(
-        (states) =>
-            states.contains(WidgetState.selected) ? _cinnabar : _softPaper,
-      ),
-      foregroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected) ? Colors.white : _ink,
-      ),
-    );
-  }
-
-  Widget _buildFourPillars() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '四柱来源',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            '手动填写覆盖自动计算，仅保存到本次档案',
-            style: TextStyle(color: _mutedInk, fontSize: 10),
           ),
           const SizedBox(height: 10),
-          SegmentedButton<String>(
-            key: const Key('four-pillars-source'),
-            segments: const [
-              ButtonSegment(
-                value: 'calculated',
-                icon: Icon(Icons.auto_awesome_outlined, size: 16),
-                label: Text('自动计算'),
-              ),
-              ButtonSegment(
-                value: 'manual',
-                icon: Icon(Icons.edit_outlined, size: 16),
-                label: Text('手动填写'),
-              ),
-            ],
-            selected: {_fourPillarsSource},
-            showSelectedIcon: false,
-            style: ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              side: const WidgetStatePropertyAll(BorderSide(color: _cinnabar)),
-              backgroundColor: WidgetStateProperty.resolveWith(
-                (states) => states.contains(WidgetState.selected)
-                    ? _cinnabar
-                    : _softPaper,
-              ),
-              foregroundColor: WidgetStateProperty.resolveWith(
-                (states) =>
-                    states.contains(WidgetState.selected) ? Colors.white : _ink,
-              ),
+          if (isCalculated)
+            Row(
+              children: [
+                Expanded(
+                  child: _DateTimeButton(
+                    key: const Key('casting-date'),
+                    icon: Icons.calendar_today_outlined,
+                    label: '日期',
+                    value:
+                        '${_dateTime.year}-${_two(_dateTime.month)}-${_two(_dateTime.day)}',
+                    onTap: _pickDate,
+                  ),
+                ),
+                Container(width: 1, height: 44, color: _rule),
+                Expanded(
+                  child: _DateTimeButton(
+                    key: const Key('casting-time'),
+                    icon: Icons.schedule_outlined,
+                    label: '北京时间',
+                    value: '${_two(_dateTime.hour)}:${_two(_dateTime.minute)}',
+                    onTap: _pickTime,
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            const Text(
+              '手动填写覆盖自动计算，仅保存到本次档案',
+              style: TextStyle(color: _mutedInk, fontSize: 10),
             ),
-            onSelectionChanged: (selection) {
-              setState(() => _fourPillarsSource = selection.first);
-            },
-          ),
-          if (_fourPillarsSource == 'manual') ...[
             const SizedBox(height: 10),
             _ManualPillarsEditor(
               value: _manualFourPillars,
               onChanged: (value) => setState(() => _manualFourPillars = value),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarPolicy() {
+    final dayLabel = _dayBoundary == engine.dayBoundaryCivil23NextDay
+        ? '过23点换日'
+        : '子正0点换日';
+    final dayHint = _dayBoundary == engine.dayBoundaryCivil23NextDay
+        ? '23:00:00.001 起进入当日子时，日柱按次日算'
+        : '0 点换日，23:00–23:59 夜子时用当日日柱';
+    final monthLabel = _monthBoundary == engine.monthBoundarySolarTermZiHour
+        ? '节气子时换月'
+        : '精确时刻换月';
+    final monthHint = _monthBoundary == engine.monthBoundarySolarTermZiHour
+        ? '进入当月节气的子时即换月柱'
+        : '按节气天文精确时刻切换月柱';
+    return Container(
+      key: const Key('calendar-policy-summary'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.explore_outlined, size: 17, color: _cinnabar),
+              const SizedBox(width: 7),
+              const Text(
+                '历法口径',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              Text(
+                '在设置中更改',
+                key: const Key('calendar-policy-hint'),
+                style: TextStyle(color: _mutedInk, fontSize: 10),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          const Text(
+            '口径随本次起卦存档，历史档案不受影响',
+            style: TextStyle(color: _mutedInk, fontSize: 10),
+          ),
+          const SizedBox(height: 10),
+          Text('交日', style: const TextStyle(color: _mutedInk, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(
+            dayLabel,
+            key: const Key('day-boundary-value'),
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            dayHint,
+            style: const TextStyle(color: _mutedInk, fontSize: 9, height: 1.4),
+          ),
+          const SizedBox(height: 10),
+          Text('交月', style: const TextStyle(color: _mutedInk, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(
+            monthLabel,
+            key: const Key('month-boundary-value'),
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            monthHint,
+            style: const TextStyle(color: _mutedInk, fontSize: 9, height: 1.4),
+          ),
         ],
       ),
     );
@@ -543,7 +496,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
             children: [
               Text(
                 '六爻编辑',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 3),
               Text(
@@ -598,7 +551,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
             key: const Key('reset-lines'),
             onPressed: _submitting ? null : _reset,
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(54),
+              minimumSize: const Size.fromHeight(44),
               side: const BorderSide(color: _cinnabar),
               foregroundColor: _ink,
             ),
@@ -611,8 +564,8 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
             key: const Key('review-cast'),
             onPressed: _submitting ? null : _reviewAndSubmit,
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(54),
-              backgroundColor: _cinnabar,
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: LiuyaoColors.cinnabar,
             ),
             child: _submitting
                 ? const SizedBox.square(
@@ -691,10 +644,10 @@ class _LineEditorRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
       decoration: BoxDecoration(
-        color: line.moving ? const Color(0xFFF8E8DF) : _softPaper,
+        color: line.moving ? DSColors.glowCinnabar : _softPaper,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: line.moving ? const Color(0x55B3261E) : Colors.transparent,
+          color: line.moving ? DSColors.accentLine : Colors.transparent,
         ),
       ),
       child: Row(
@@ -753,7 +706,7 @@ class _LineEditorRow extends StatelessWidget {
                   '${line.value}',
                   style: const TextStyle(
                     color: _cinnabar,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
@@ -871,7 +824,7 @@ class _CastingConfirmation extends StatelessWidget {
           children: [
             const Text(
               '确认起卦输入',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -884,7 +837,7 @@ class _CastingConfirmation extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: _softPaper,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -936,7 +889,9 @@ class _CastingConfirmation extends StatelessWidget {
                   child: FilledButton(
                     key: const Key('confirm-manual-cast'),
                     onPressed: () => Navigator.pop(context, true),
-                    style: FilledButton.styleFrom(backgroundColor: _cinnabar),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: LiuyaoColors.cinnabar,
+                    ),
                     child: const Text('确认并排盘'),
                   ),
                 ),
@@ -962,7 +917,7 @@ class _InlineError extends StatelessWidget {
       key: const Key('casting-error'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEDEA),
+        color: DSColors.glowCinnabar,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

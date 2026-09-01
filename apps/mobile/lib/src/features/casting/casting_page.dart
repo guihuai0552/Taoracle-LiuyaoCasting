@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../ui/liuyao_design.dart';
+import '../../ui/design_system/components/daoyu_brand_title.dart';
+import '../../ui/design_system/components/ds_segmented_control.dart';
+import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_typography.dart';
 import 'automatic_casting_page.dart';
 import 'casting_client.dart';
 import 'manual_casting_page.dart';
@@ -53,54 +56,58 @@ class _CastingPageState extends State<CastingPage> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-              child: SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<CastingMode>(
-                  key: const Key('casting-mode-switch'),
-                  style: ButtonStyle(
-                    backgroundColor: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.selected)
-                          ? LiuyaoColors.ink
-                          : LiuyaoColors.paperRaised,
-                    ),
-                    foregroundColor: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.selected)
-                          ? LiuyaoColors.paperRaised
-                          : LiuyaoColors.ink,
-                    ),
-                    side: const WidgetStatePropertyAll(
-                      BorderSide(color: LiuyaoColors.ink, width: 1),
-                    ),
-                    shape: WidgetStatePropertyAll(
-                      RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-                      ),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 「道谕六爻」品牌标题统一组件（与档案页基准一致）。
+                        const DaoyuBrandTitle(
+                          keyOverride: Key('casting-brand-title'),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '起卦台 · 问题 · 时间 · 摇卦',
+                          style: DSTypography.body(
+                            fontSize: 12,
+                            color: DSColors.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  segments: const [
-                    ButtonSegment(
-                      value: CastingMode.manual,
-                      icon: Icon(Icons.edit_outlined),
-                      label: Text('手动'),
-                    ),
-                    ButtonSegment(
-                      value: CastingMode.automatic,
-                      icon: Icon(Icons.casino_outlined),
-                      label: Text('自动铜钱'),
-                    ),
-                    ButtonSegment(
-                      value: CastingMode.timePillar,
-                      icon: Icon(Icons.access_time_outlined),
-                      label: Text('时刻起卦'),
-                    ),
-                  ],
-                  selected: {_mode},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (selection) {
-                    setState(() => _mode = selection.first);
-                  },
-                ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: DSSegmentedControl<CastingMode>(
+                keyOverride: const Key('casting-mode-switch'),
+                segments: const [
+                  DSSegmentItem(
+                    value: CastingMode.manual,
+                    label: '手动',
+                    icon: Icons.edit_outlined,
+                  ),
+                  DSSegmentItem(
+                    value: CastingMode.automatic,
+                    label: '自动铜钱',
+                    icon: Icons.casino_outlined,
+                  ),
+                  DSSegmentItem(
+                    value: CastingMode.timePillar,
+                    label: '时刻起卦',
+                    icon: Icons.access_time_outlined,
+                  ),
+                ],
+                selected: {_mode},
+                onSelectionChanged: (selection) {
+                  setState(() => _mode = selection.first);
+                },
               ),
             ),
             Expanded(

@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liuyao_archive/src/app.dart';
+import 'package:liuyao_archive/src/ui/liuyao_design.dart';
+import 'package:liuyao_archive/src/features/settings/app_preferences.dart';
 import 'package:liuyao_archive/src/features/almanac/almanac_client.dart';
 import 'package:liuyao_archive/src/features/almanac/almanac_models.dart';
 import 'package:liuyao_archive/src/features/almanac/almanac_page.dart';
@@ -18,6 +22,26 @@ import 'package:liuyao_archive/src/features/casting/time_pillar_casting_page.dar
 import 'package:liuyao_engine/liuyao_engine.dart' as liuyao_engine;
 
 void main() {
+  // 偏好读写注入临时目录，避免 path_provider 在测试环境挂起。
+  late Directory _prefsTempDir;
+
+  setUpAll(() async {
+    _prefsTempDir = await Directory.systemTemp.createTemp(
+      'liuyao_widget_prefs',
+    );
+  });
+
+  setUp(() {
+    preferencesDirectoryOverride = () async => _prefsTempDir;
+    resetPreferencesCacheForTest();
+  });
+
+  tearDownAll(() async {
+    preferencesDirectoryOverride = null;
+    resetPreferencesCacheForTest();
+    await _prefsTempDir.delete(recursive: true);
+  });
+
   test('cast preview parses the automatic audit record', () {
     final preview = CastPreview.fromJson(
       _castJson(
@@ -227,14 +251,10 @@ void main() {
     // 爻位方向：上爻在上、初爻在下（与卦面爻线方向一致）。
     final ledger = find.byKey(const Key('five-stars-ledger'));
     final shangYaoY = tester
-        .getTopLeft(
-          find.descendant(of: ledger, matching: find.text('上爻')),
-        )
+        .getTopLeft(find.descendant(of: ledger, matching: find.text('上爻')))
         .dy;
     final chuYaoY = tester
-        .getTopLeft(
-          find.descendant(of: ledger, matching: find.text('初爻')),
-        )
+        .getTopLeft(find.descendant(of: ledger, matching: find.text('初爻')))
         .dy;
     expect(shangYaoY, lessThan(chuYaoY));
   });
@@ -301,7 +321,9 @@ void main() {
     expect(nayin, isNotEmpty);
     expect(growth, isNotEmpty);
     expect(fivestar, isNotEmpty);
-    expect(mansion, endsWith('宿'));
+    // 二十八宿改单字显示（省空间），不再带「宿」后缀。
+    expect(mansion, isNotEmpty);
+    expect(mansion!.length, 1);
     final starShort = preview.annotations.fiveStars!.placementAt(1)!.star;
     expect(fivestar, switch (starShort) {
       '镇土' => '镇',
@@ -348,20 +370,30 @@ void main() {
     expect(find.byKey(const Key('base-nayin-1')), findsNothing);
     expect(find.byKey(const Key('base-growth-1')), findsOneWidget);
 
-    // 总开关：关闭全部。
-    await tester.tap(find.byKey(const Key('line-annotations-switch')));
+    // 总开关已移除：改为逐项关闭其余细分开关，验证互不影响。
+    await tester.tap(find.byKey(const Key('show-twelve-growth')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('base-nayin-1')), findsNothing);
     expect(find.byKey(const Key('base-growth-1')), findsNothing);
+    expect(find.byKey(const Key('base-fivestar-1')), findsOneWidget);
+    expect(find.byKey(const Key('mansion-1')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('show-five-stars')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('base-fivestar-1')), findsNothing);
+    await tester.tap(find.byKey(const Key('show-28-mansions')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('mansion-1')), findsNothing);
 
-    // 重新打开总开关：纳音细分仍为关闭，其余恢复。
-    await tester.tap(find.byKey(const Key('line-annotations-switch')));
+    // 重新打开：纳音保持关闭，其余恢复。
+    await tester.tap(find.byKey(const Key('show-twelve-growth')));
+    await tester.tap(find.byKey(const Key('show-five-stars')));
+    await tester.tap(find.byKey(const Key('show-28-mansions')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('base-nayin-1')), findsNothing);
     expect(find.byKey(const Key('base-growth-1')), findsOneWidget);
     expect(find.byKey(const Key('base-fivestar-1')), findsOneWidget);
+    expect(find.byKey(const Key('mansion-1')), findsOneWidget);
   });
 
   testWidgets('tapping line growth switches reference and mode across layers', (
@@ -453,20 +485,27 @@ void main() {
     await tester.tap(find.byKey(const Key('growth-choice-five_stars')));
     await tester.pumpAndSettle();
 
-    // 本卦十二长生槽位显示五星短名，独立五星段隐藏避免重复。
+    // 修复后行为：五星模式只切换面板参照，爻位行长生与五星并列独立显示，
+    // 五星不再挤占十二长生槽位。
     expect(
       tester.widget<Text>(find.byKey(const Key('base-growth-1'))).data,
+      layerStage(null, 1, 'year'),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('base-fivestar-1')))
+          .data,
       layerStar(null, 1),
     );
-    expect(find.byKey(const Key('base-fivestar-1')), findsNothing);
-    // 伏神/变卦同步切换为各自层五星。
     expect(
       tester.widget<Text>(find.byKey(const Key('hidden-growth-1'))).data,
-      layerStar(preview.annotations.hiddenHexagramAnnotations, 1),
+      layerStage(preview.annotations.hiddenHexagramAnnotations, 1, 'year'),
     );
     expect(
-      tester.widget<Text>(find.byKey(const Key('changed-growth-1'))).data,
-      layerStar(preview.annotations.changedHexagramAnnotations, 1),
+      tester
+          .widget<Text>(find.byKey(const Key('changed-growth-1')))
+          .data,
+      layerStage(preview.annotations.changedHexagramAnnotations, 1, 'year'),
     );
   });
 
@@ -543,6 +582,8 @@ void main() {
     expect(find.text('六月廿三'), findsOneWidget);
     expect(find.text('丙午'), findsWidgets);
     expect(find.text('正东'), findsOneWidget);
+    expect(find.text('当值星宿'), findsOneWidget);
+    expect(find.text('室火猪'), findsOneWidget);
     expect(source.lastDay, DateTime(2026, 8, 5));
     expect(source.lastHour, 15);
   });
@@ -583,6 +624,12 @@ void main() {
   testWidgets('almanac selected date flows into casting page', (tester) async {
     await tester.binding.setSurfaceSize(const Size(430, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    // 预置已设置历法口径，避免首次弹窗遮挡导航交互。
+    await tester.runAsync(
+      () => savePreferences(
+        const AppPreferences().copyWith(calendarPolicySetupCompleted: true),
+      ),
+    );
     final almanac = _FakeAlmanacDataSource();
     final casting = _FakeCastingDataSource();
     await tester.pumpWidget(
@@ -590,12 +637,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('calendar-day-2026-08-09')));
+    // 日历默认跟随「今天」，用动态当月日期避免跨月后找不到格子。
+    final now = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    final dayKey =
+        'calendar-day-${now.year}-${two(now.month)}-${two(now.day)}';
+    await tester.tap(find.byKey(Key(dayKey)));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('六爻'));
+    await tester.tap(find.byKey(const Key('nav-liuyao')));
     await tester.pumpAndSettle();
 
-    expect(find.text('2026-08-09'), findsOneWidget);
+    expect(
+      find.text('${now.year}-${two(now.month)}-${two(now.day)}'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('year-month picker jumps to a specific month', (tester) async {
@@ -635,6 +690,12 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(430, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    // 预置已设置历法口径，避免首次弹窗遮挡导航交互。
+    await tester.runAsync(
+      () => savePreferences(
+        const AppPreferences().copyWith(calendarPolicySetupCompleted: true),
+      ),
+    );
     final source = _FakeAlmanacDataSource();
     final castingSource = _FakeCastingDataSource();
     await tester.pumpWidget(
@@ -651,15 +712,17 @@ void main() {
     expect(find.text('设置'), findsOneWidget);
     expect(find.text('助手'), findsNothing);
 
-    await tester.tap(find.text('六爻'));
+    await tester.tap(find.byKey(const Key('nav-liuyao')));
     await tester.pumpAndSettle();
-    expect(find.text('手动起卦'), findsOneWidget);
+    // 模式大标题已删除（与顶部选项重复），仅保留分段控件标签。
+    expect(find.text('手动起卦'), findsNothing);
+    expect(find.text('手动'), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('casting-question')), '保留这条草稿');
     await tester.tap(find.byKey(const Key('line-toggle-6')));
     await tester.tap(find.text('日历'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('六爻'));
+    await tester.tap(find.byKey(const Key('nav-liuyao')));
     await tester.pumpAndSettle();
 
     final question = tester.widget<TextField>(
@@ -670,7 +733,7 @@ void main() {
 
     await tester.tap(find.text('自动铜钱'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('automatic-casting-title')), findsOneWidget);
+    expect(find.byKey(const Key('automatic-casting-title')), findsNothing);
     await tester.tap(find.text('手动'));
     await tester.pumpAndSettle();
     expect(
@@ -686,6 +749,21 @@ void main() {
     expect(find.byKey(const Key('settings-title')), findsOneWidget);
     expect(find.byKey(const Key('settings-local-data-card')), findsOneWidget);
     expect(find.text('档案保存在本机'), findsOneWidget);
+    // 2026-09-01 需求：设计系统预览入口移除，改为作者其他产品入口。
+    expect(
+      find.byKey(const Key('settings-design-preview')),
+      findsNothing,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings-taoracle-entry')),
+      240,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('settings-taoracle-entry')),
+      findsOneWidget,
+    );
+    expect(find.text('道谕Taoracle'), findsOneWidget);
   });
 
   testWidgets('manual editor serializes top-down edits bottom-to-top', (
@@ -754,13 +832,16 @@ void main() {
     expect(archive.detail.chart.lineValues, [9, 7, 7, 7, 7, 6]);
     expect(find.byKey(const Key('case-result-title')), findsOneWidget);
     expect(find.byKey(const Key('auto-archive-banner')), findsOneWidget);
-    expect(find.text('泽天夬 → 天风姤'), findsOneWidget);
+    // 扁平排版：重复的「本卦 → 变卦」流程行已删，两列卦名仍在。
+    expect(find.text('泽天夬'), findsOneWidget);
+    expect(find.text('天风姤'), findsOneWidget);
     expect(find.byKey(const Key('liuyao-chart-table')), findsOneWidget);
     expect(find.byKey(const Key('base-hexagram-summary')), findsOneWidget);
     expect(find.byKey(const Key('changed-hexagram-summary')), findsOneWidget);
-    expect(find.byKey(const Key('hidden-hexagram-summary')), findsOneWidget);
-    expect(find.byKey(const Key('mansion-world-summary')), findsOneWidget);
-    expect(find.text('坤为地'), findsOneWidget);
+    // 线框精简：伏卦头部行与京房宿/64卦序卡已移除（伏神列信息仍在表格内）。
+    expect(find.byKey(const Key('hidden-hexagram-summary')), findsNothing);
+    expect(find.byKey(const Key('mansion-world-summary')), findsNothing);
+    expect(find.text('坤为地'), findsNothing);
     expect(find.byKey(const Key('pillar-time-panel')), findsOneWidget);
     expect(find.byKey(const Key('time-year-stem')), findsOneWidget);
     expect(find.byKey(const Key('time-hour-void')), findsOneWidget);
@@ -783,15 +864,21 @@ void main() {
     );
     expect(
       tester.widget<Text>(find.byKey(const Key('base-stem-1'))).style?.color,
-      const Color(0xFF347445),
+      LiuyaoColors.wood,
     );
     expect(
       tester.widget<Text>(find.byKey(const Key('base-branch-1'))).style?.color,
-      const Color(0xFF216B9B),
+      LiuyaoColors.water,
     );
     expect(find.byKey(const Key('result-twelve-section')), findsOneWidget);
     expect(find.byKey(const Key('result-shensha-section')), findsOneWidget);
     expect(find.byKey(const Key('result-chart-card')), findsOneWidget);
+    // 卦属性去重：泽天夬/天风姤无六冲六合，宫序 6/2 非游魂归魂，
+    // 属性括号与 MetaTag 均不应出现（防重复显示回归）。
+    expect(find.textContaining('六冲'), findsNothing);
+    expect(find.textContaining('六合'), findsNothing);
+    expect(find.textContaining('游魂'), findsNothing);
+    expect(find.textContaining('归魂'), findsNothing);
   });
 
   testWidgets('manual editor validates question and confirms reset', (
@@ -825,8 +912,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('review-cast')));
     await tester.pumpAndSettle();
-    expect(find.text('请先填写占问事项'), findsOneWidget);
+    // 问念可空（2026-09-01 需求）：留空不再报错，确认单中记为「暂无问念」。
+    expect(find.textContaining('暂无问念'), findsOneWidget);
     expect(source.callCount, 0);
+    // 点确认单外的遮罩关闭，回到编辑器。
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('暂无问念'), findsNothing);
 
     await tester.dragUntilVisible(
       find.byKey(const Key('reset-lines')),
@@ -840,6 +932,34 @@ void main() {
     await tester.tap(find.text('确认重置'));
     await tester.pumpAndSettle();
     expect(find.text('7 · 7 · 7 · 7 · 7 · 7'), findsOneWidget);
+  });
+
+  testWidgets('casting without question archives 暂无问念', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final source = _FakeCastingDataSource();
+    final archive = _FakeArchiveDataSource();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AutomaticCastingPage(
+          dataSource: source,
+          archiveDataSource: archive,
+          initialDateTime: DateTime(2026, 8, 5, 15, 26),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 完全不填占问事项，直接起卦。
+    await tester.tap(find.byKey(const Key('automatic-cast')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('confirm-automatic-cast')));
+    await tester.pumpAndSettle();
+
+    expect(source.automaticCallCount, 1);
+    expect(source.lastQuestion, '暂无问念');
+    expect(archive.detail.question, '暂无问念');
+    expect(find.byKey(const Key('case-result-title')), findsOneWidget);
   });
 
   testWidgets('automatic casting auto-archives and shows every raw coin', (
@@ -881,6 +1001,23 @@ void main() {
     expect(find.byKey(const Key('case-result-title')), findsOneWidget);
     expect(find.byKey(const Key('auto-archive-banner')), findsOneWidget);
     expect(find.byKey(const Key('liuyao-chart-table')), findsOneWidget);
+    // 起卦记录默认不显示（显示偏好默认关闭，设置中可开启）。
+    expect(
+      find.byKey(const Key('result-casting-record-section')),
+      findsNothing,
+    );
+    // 开启偏好后重新进入页面可见并展开。
+    await tester.runAsync(
+      () =>
+          savePreferences(currentPreferences.copyWith(showCastingRecord: true)),
+    );
+    await tester.binding.setSurfaceSize(const Size(430, 2000));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('result-casting-record-section')),
       findsOneWidget,
@@ -893,6 +1030,12 @@ void main() {
     expect(find.byKey(const Key('coin-line-1')), findsOneWidget);
     expect(find.text('2 + 3 + 3 = 8'), findsOneWidget);
     expect(find.textContaining('系统随机'), findsOneWidget);
+    // 还原偏好，避免影响其他测试。
+    await tester.runAsync(
+      () => savePreferences(
+        currentPreferences.copyWith(showCastingRecord: false),
+      ),
+    );
   });
 
   testWidgets('time pillar casting auto-archives and records method', (
@@ -913,10 +1056,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('time-pillar-casting-title')), findsOneWidget);
-    // 附件《时刻起卦法详解》新口径：一时辰十二刻、每刻十分钟。
-    expect(find.textContaining('一时辰十二刻'), findsOneWidget);
-    expect(find.textContaining('内卦 = 时支后天八卦'), findsOneWidget);
+    expect(find.byKey(const Key('time-pillar-casting-title')), findsNothing);
+    // 时刻起卦法 2.0 口径：方法卡中的取数说明（刻干纳甲内卦、日时干序动爻）。
+    expect(find.textContaining('均分 12 刻'), findsOneWidget);
+    expect(find.textContaining('内卦 = 刻干纳甲翻卦'), findsOneWidget);
+    expect(find.textContaining('动爻 =（日干序数 + 时干序数）'), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('time-pillar-question')),
       '此刻是否适合出行？',
@@ -1010,6 +1154,15 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final source = _FakeCastingDataSource();
     final archive = _FakeArchiveDataSource();
+    // 口径现在来自全局偏好（首次弹窗/设置页维护），页面内为只读摘要。
+    await tester.runAsync(
+      () => savePreferences(
+        currentPreferences.copyWith(
+          dayBoundaryStrategy: 'astronomical_midnight',
+          monthBoundaryStrategy: 'solar_term_zi_hour',
+        ),
+      ),
+    );
     await tester.pumpWidget(
       MaterialApp(
         home: ManualCastingPage(
@@ -1025,11 +1178,8 @@ void main() {
     tester.testTextInput.hide();
     await tester.pumpAndSettle();
 
-    // 交日切换为「子正0点换日」
-    await tester.tap(find.byKey(const Key('day-boundary-selector')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('子正0点换日'));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('day-boundary-value')), findsOneWidget);
+    expect(find.text('子正0点换日'), findsOneWidget);
 
     await tester.dragUntilVisible(
       find.byKey(const Key('review-cast')),
@@ -1044,6 +1194,106 @@ void main() {
 
     expect(source.lastDayBoundary, 'astronomical_midnight');
     expect(source.lastMonthBoundary, 'solar_term_zi_hour');
+    // 还原偏好，避免影响其他测试。
+    await tester.runAsync(
+      () => savePreferences(
+        currentPreferences.copyWith(
+          dayBoundaryStrategy: liuyao_engine.dayBoundaryCivil23NextDay,
+          monthBoundaryStrategy: liuyao_engine.monthBoundarySolarTermZiHour,
+        ),
+      ),
+    );
+  });
+
+  testWidgets('case detail deletes archive only after confirmation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(home: ArchivePage(dataSource: archive)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('archive-case-case-1')));
+    await tester.pumpAndSettle();
+
+    // 二次确认：先取消，不应删除。
+    await tester.tap(find.byKey(const Key('case-delete')));
+    await tester.pumpAndSettle();
+    expect(find.text('删除这份档案？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('case-delete-cancel')));
+    await tester.pumpAndSettle();
+    expect(archive.deleteCount, 0);
+
+    // 确认后删除并返回列表。
+    await tester.tap(find.byKey(const Key('case-delete')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('case-delete-confirm')));
+    await tester.pumpAndSettle();
+    expect(archive.deleteCount, 1);
+    expect(archive.deletedId, 'case-1');
+    expect(find.byKey(const Key('case-detail-scroll')), findsNothing);
+  });
+
+  testWidgets('archive list long-press deletes case after confirmation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: ArchivePage(dataSource: archive))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byKey(const Key('archive-case-case-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('删除这份档案？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('archive-delete-confirm')));
+    await tester.pumpAndSettle();
+    expect(archive.deleteCount, 1);
+    expect(archive.deletedId, 'case-1');
+    expect(find.text('档案已删除'), findsOneWidget);
+  });
+
+  testWidgets('archive swipe-to-delete confirms then removes the case', (
+    tester,
+  ) async {
+    // 2026-09-01 需求：卡片滑动（挂历式）呼出删除，confirmDismiss 二次确认。
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: ArchivePage(dataSource: archive))),
+    );
+    await tester.pumpAndSettle();
+
+    // 第一次右滑：取消，卡片弹回、未删除。
+    await tester.drag(
+      find.byKey(const Key('archive-case-case-1')),
+      const Offset(360, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('删除这份档案？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('archive-delete-cancel')));
+    await tester.pumpAndSettle();
+    expect(archive.deleteCount, 0);
+    expect(find.byKey(const Key('archive-case-case-1')), findsOneWidget);
+
+    // 第二次右滑：确认，卡片移除并落库删除。
+    await tester.drag(
+      find.byKey(const Key('archive-case-case-1')),
+      const Offset(360, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('删除这份档案？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('archive-delete-confirm')));
+    await tester.pumpAndSettle();
+    expect(archive.deleteCount, 1);
+    expect(archive.deletedId, 'case-1');
+    expect(find.byKey(const Key('archive-case-case-1')), findsNothing);
+    expect(find.text('档案已删除'), findsOneWidget);
   });
 
   testWidgets(
@@ -1076,7 +1326,9 @@ void main() {
       await tester.tap(find.byKey(const Key('archive-case-case-1')));
       await tester.pumpAndSettle();
 
-      expect(find.text('泽天夬 → 天风姤'), findsOneWidget);
+      // 扁平排版：流程行已删，两列卦名分别可见。
+      expect(find.text('泽天夬'), findsOneWidget);
+      expect(find.text('天风姤'), findsOneWidget);
       expect(find.byKey(const Key('result-chart-card')), findsOneWidget);
       expect(find.byKey(const Key('result-twelve-section')), findsOneWidget);
       expect(find.byKey(const Key('result-shensha-section')), findsOneWidget);
@@ -1214,7 +1466,8 @@ void main() {
         layerStage(preview.annotations.changedHexagramAnnotations, 1, 'year'),
       );
 
-      // 再次点击 → 选京房五星，三层标注切换为五星短名。
+      // 再次点击 → 选京房五星：修复后五星只切换面板参照，
+      // 爻位行长生保持、五星独立段显示，二者并列不互相挤占。
       await tester.ensureVisible(find.byKey(const Key('base-growth-tap-1')));
       await tester.tap(find.byKey(const Key('base-growth-tap-1')));
       await tester.pumpAndSettle();
@@ -1222,15 +1475,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.widget<Text>(find.byKey(const Key('base-growth-1'))).data,
+        layerStage(null, 1, 'year'),
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('base-fivestar-1'))).data,
         layerStar(null, 1),
       );
       expect(
         tester.widget<Text>(find.byKey(const Key('hidden-growth-1'))).data,
-        layerStar(preview.annotations.hiddenHexagramAnnotations, 1),
+        layerStage(preview.annotations.hiddenHexagramAnnotations, 1, 'year'),
       );
       expect(
         tester.widget<Text>(find.byKey(const Key('changed-growth-1'))).data,
-        layerStar(preview.annotations.changedHexagramAnnotations, 1),
+        layerStage(preview.annotations.changedHexagramAnnotations, 1, 'year'),
       );
     },
   );
@@ -1266,25 +1523,141 @@ void main() {
     expect(find.byKey(const Key('base-nayin-1')), findsNothing);
     expect(find.byKey(const Key('base-growth-1')), findsOneWidget);
 
-    // 总开关：关闭全部。
+    // 总开关已移除：逐项关闭其余细分开关，验证互不影响。
     await _scrollTo(tester, const Key('line-annotations-toggle'));
-    await tester.tap(find.byKey(const Key('line-annotations-switch')));
+    await tester.tap(find.byKey(const Key('show-twelve-growth')));
     await tester.pumpAndSettle();
     await _scrollTo(tester, const Key('result-chart-card'));
     expect(find.byKey(const Key('base-nayin-1')), findsNothing);
     expect(find.byKey(const Key('base-growth-1')), findsNothing);
-    expect(find.byKey(const Key('base-fivestar-1')), findsNothing);
-    expect(find.byKey(const Key('mansion-1')), findsNothing);
+    expect(find.byKey(const Key('base-fivestar-1')), findsOneWidget);
+    expect(find.byKey(const Key('mansion-1')), findsOneWidget);
 
-    // 重新打开总开关：纳音细分仍为关闭，其余恢复。
     await _scrollTo(tester, const Key('line-annotations-toggle'));
-    await tester.tap(find.byKey(const Key('line-annotations-switch')));
+    await tester.tap(find.byKey(const Key('show-five-stars')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('base-fivestar-1')), findsNothing);
+
+    // 重新打开：纳音保持关闭，其余恢复。
+    await _scrollTo(tester, const Key('line-annotations-toggle'));
+    await tester.tap(find.byKey(const Key('show-twelve-growth')));
+    await tester.tap(find.byKey(const Key('show-five-stars')));
     await tester.pumpAndSettle();
     await _scrollTo(tester, const Key('base-fivestar-1'));
     expect(find.byKey(const Key('base-nayin-1')), findsNothing);
     expect(find.byKey(const Key('base-growth-1')), findsOneWidget);
     expect(find.byKey(const Key('base-fivestar-1')), findsOneWidget);
     expect(find.byKey(const Key('mansion-1')), findsOneWidget);
+  });
+
+  testWidgets('detail page manages archive tags and persists them', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 打开标签编辑弹窗。
+    await _scrollTo(tester, const Key('edit-tags'));
+    await tester.tap(find.byKey(const Key('edit-tags')));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑标签'), findsOneWidget);
+
+    // 添加两个标签。
+    await tester.enterText(find.byKey(const Key('tag-input')), '工作');
+    tester.testTextInput.hide();
+    await tester.tap(find.byKey(const Key('add-tag')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('tag-input')), '待复盘');
+    tester.testTextInput.hide();
+    await tester.tap(find.byKey(const Key('add-tag')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tag-chip-工作')), findsOneWidget);
+    expect(find.byKey(const Key('tag-chip-待复盘')), findsOneWidget);
+
+    // 保存并确认详情页显示标签。
+    await tester.tap(find.byKey(const Key('save-tags')));
+    await tester.pumpAndSettle();
+    expect(archive.detail.tags, containsAll(['工作', '待复盘']));
+    await _scrollTo(tester, const Key('edit-tags'));
+    expect(find.byKey(const Key('detail-tag-工作')), findsOneWidget);
+    expect(find.byKey(const Key('detail-tag-待复盘')), findsOneWidget);
+
+    // 删除一个标签并保存。
+    await tester.tap(find.byKey(const Key('edit-tags')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('tag-chip-工作')),
+        matching: find.byTooltip('删除'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('save-tags')));
+    await tester.pumpAndSettle();
+    expect(archive.detail.tags, ['待复盘']);
+  });
+
+  test('legacy snapshot backfills palace sequence from hexagram code', () {
+    final preview = CastPreview.fromJson(_legacyJson());
+    expect(preview.isLegacySnapshot, isTrue);
+    // 山天大畜（艮宫第3卦）、山泽损（艮宫第4卦）由卦码补算，不再显示「序位未记录」。
+    expect(preview.chart.base.palaceSequence, 3);
+    expect(preview.chart.changed?.palaceSequence, 4);
+    expect(preview.hasCanonicalPalaceSequence, isTrue);
+  });
+
+  testWidgets('nayin annotation renders element-colored text on chart', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final detail = _engineCaseDetail();
+    final archive = _FakeArchiveDataSource();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 泽天夬初爻甲子 → 海中金 → 五行金 → metal 色。
+    await _scrollTo(tester, const Key('base-nayin-1'));
+    final nayin = tester.widget<Text>(find.byKey(const Key('base-nayin-1')));
+    expect(nayin.data, '海中金');
+    expect(nayin.style?.color, LiuyaoColors.metal);
+  });
+
+  testWidgets('manual casting hides calendar policy card after first setup', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => savePreferences(
+        currentPreferences.copyWith(calendarPolicySetupCompleted: true),
+      ),
+    );
+    addTearDown(() async {
+      await tester.runAsync(
+        () => savePreferences(
+          currentPreferences.copyWith(calendarPolicySetupCompleted: false),
+        ),
+      );
+    });
+    final source = _FakeCastingDataSource();
+    final archive = _FakeArchiveDataSource();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ManualCastingPage(dataSource: source, archiveDataSource: archive),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('calendar-policy-summary')), findsNothing);
   });
 
   testWidgets('archive image export produces a complete PNG document', (
@@ -1320,6 +1693,164 @@ void main() {
     expect(bytes, isNotNull);
     expect(bytes!.length, greaterThan(1000));
     expect(bytes.take(8).toList(), [137, 80, 78, 71, 13, 10, 26, 10]);
+  });
+
+  testWidgets('archive image export drops header for default title', (
+    tester,
+  ) async {
+    // 2026-09-01 需求：左上角卦名与「卦档案」印章全部移除——标题等于
+    // 本卦名（档案默认标题）时头部不占空间；自定义标题才保留一行。
+    // 通过 PNG IHDR 的高度差锁定：自定义标题图比默认标题图高 84+28=112px。
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: SizedBox(key: Key('anchor'))),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final archive = _FakeArchiveDataSource.withCase();
+    final context = tester.element(find.byKey(const Key('anchor')));
+
+    int pngHeight(dynamic bytes) {
+      expect(bytes.take(8).toList(), [137, 80, 78, 71, 13, 10, 26, 10]);
+      // PNG：8 字节签名 + IHDR(4 长度 + 4 类型) + 宽 4 字节 + 高 4 字节 big-endian。
+      return (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+    }
+
+    final custom = await tester.runAsync(
+      () => buildCaseArchivePng(context, archive.detail),
+    );
+    final defaultTitle = await tester.runAsync(
+      () => buildCaseArchivePng(context, archive.defaultTitledDetail),
+    );
+    expect(custom, isNotNull);
+    expect(defaultTitle, isNotNull);
+    final customHeight = pngHeight(custom!);
+    final defaultHeight = pngHeight(defaultTitle!);
+    expect(customHeight, greaterThan(0));
+    expect(customHeight - defaultHeight, 112);
+  });
+
+  testWidgets('almanac calendar expands below annotation toggles', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final preview = CastPreview.fromEngineResult(
+      liuyao_engine.manualCast(DateTime(2026, 8, 4, 22, 22, 29), const [
+        7,
+        7,
+        9,
+        8,
+        8,
+        7,
+      ]),
+      question: '万年历',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(child: LiuyaoChartPreview(preview: preview)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('mini-almanac-calendar')), findsNothing);
+    await tester.ensureVisible(
+      find.byKey(const Key('show-almanac-calendar')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('show-almanac-calendar')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('mini-almanac-calendar')), findsOneWidget);
+    // 默认显示起卦时间所在月，并默认选中起卦日（2026-08-04）。
+    expect(find.text('2026年08月'), findsOneWidget);
+    expect(find.byKey(const Key('mini-cal-detail')), findsOneWidget);
+
+    // 选中日摘要：日柱干支与农历全称均由引擎同口径计算得出。
+    String pillarOf(Text widget) => (widget.textSpan as TextSpan).toPlainText();
+    final castDay = DateTime(2026, 8, 4);
+    final castLunar = liuyao_engine.solarToLunar(castDay);
+    final detailPillar = tester.widget<Text>(
+      find.byKey(const Key('mini-cal-detail-pillar')),
+    );
+    expect(pillarOf(detailPillar), liuyao_engine.calculateDayGanzhi(castDay));
+    final detailLunar = tester.widget<Text>(
+      find.byKey(const Key('mini-cal-detail-lunar')),
+    );
+    expect(detailLunar.data, contains(castLunar.dayCn));
+
+    // 日期格副行显示农历：8 月 1 日的农历标签（初一为月名，否则农历日；
+    // 节气日优先显示节气）必须出现在网格里。
+    final monthStart = DateTime(2026, 8, 1);
+    final startLunar = liuyao_engine.solarToLunar(monthStart);
+    final startTerm = liuyao_engine.getSolarTerm(monthStart);
+    final startLabel = startTerm != null && startTerm.isNotEmpty
+        ? startTerm
+        : (startLunar.day == 1 ? startLunar.monthCn : startLunar.dayCn);
+    expect(find.text(startLabel), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('mini-cal-next')));
+    await tester.pumpAndSettle();
+    expect(find.text('2026年09月'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('mini-cal-day-2026-9-15')));
+    await tester.pumpAndSettle();
+    // 点选后摘要切换为新选中日的日柱。
+    final switchedPillar = tester.widget<Text>(
+      find.byKey(const Key('mini-cal-detail-pillar')),
+    );
+    expect(
+      pillarOf(switchedPillar),
+      liuyao_engine.calculateDayGanzhi(DateTime(2026, 9, 15)),
+    );
+  });
+
+  testWidgets('archive page creates custom tags and detail editor offers them', (
+    tester,
+  ) async {
+    addTearDown(resetPreferencesCacheForTest);
+    resetPreferencesCacheForTest();
+    // testWidgets 的 FakeAsync 不会调度真实 IO 回调，
+    // 偏好写盘必须经 runAsync 在真实事件循环中完成。
+    await tester.runAsync(
+      () => savePreferences(
+        currentPreferences.copyWith(customTags: const ['占工作']),
+      ),
+    );
+
+    // 档案页「＋ 标签」：新建自定义标签并持久化，关闭后出现在筛选行。
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(home: ArchivePage(dataSource: archive)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tag-filter-add')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('tag-filter-add')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tag-new-input')), findsOneWidget);
+    expect(find.byKey(const Key('tag-manage-custom-占工作')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('tag-new-input')), '待复盘');
+    await tester.tap(find.byKey(const Key('tag-new-add')));
+    await tester.pumpAndSettle();
+    expect(currentPreferences.customTags, contains('待复盘'));
+    await tester.tap(find.byType(ModalBarrier).last, warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 详情页编辑标签：自定义标签出现在「快速选用」建议中，点选即加入。
+    final detail = await archive.getCase(archive.detail.id);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('edit-tags')));
+    await tester.tap(find.byKey(const Key('edit-tags')));
+    await tester.pumpAndSettle();
+    expect(find.text('快速选用'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('tag-suggest-占工作')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tag-chip-占工作')), findsOneWidget);
   });
 }
 
@@ -1446,6 +1977,7 @@ class _FakeAlmanacDataSource implements AlmanacDataSource {
       ),
       currentTwoHourIndex: selectedIndex,
       wealthGodDirection: '正东',
+      twentyEightMansion: '室火猪',
     );
   }
 
@@ -1587,12 +2119,28 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
     });
   }
 
+  /// 标题取默认本卦名的同内容档案（导出头部回归测试用）。
+  CaseDetail get defaultTitledDetail => CaseDetail.fromJson({
+    'id': detail.id,
+    'title': detail.baseHexagram,
+    'question': detail.question,
+    'castAt': detail.castAt.toIso8601String(),
+    'castingMethod': detail.castingMethod,
+    'baseHexagram': detail.baseHexagram,
+    'changedHexagram': detail.changedHexagram,
+    'latestAnalysisRevision': detail.latestAnalysisRevision,
+    'createdAt': detail.createdAt.toIso8601String(),
+    'updatedAt': detail.updatedAt.toIso8601String(),
+    'chart': detail.chartJson,
+    'analyses': const [],
+    'feedbacks': const [],
+  });
+
   void _rebuild({
     Map<String, dynamic>? chart,
     String? questionContext,
     List<String>? tags,
-  }) {
-    final json = <String, dynamic>{
+  }) {    final json = <String, dynamic>{
       'id': detail.id,
       'title': detail.title,
       'question': detail.question,
@@ -1617,6 +2165,7 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
     String query = '',
     List<String> tags = const [],
   }) async {
+    if (deleteCount > 0) return const [];
     if (tags.isNotEmpty) {
       return detail.tags.toSet().containsAll(tags) ? [detail] : const [];
     }
@@ -1691,6 +2240,15 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
 
   @override
   Future<CaseDetail> getCase(String id) async => detail;
+
+  int deleteCount = 0;
+  String? deletedId;
+
+  @override
+  Future<void> deleteCase(String id) async {
+    deleteCount += 1;
+    deletedId = id;
+  }
 
   @override
   Future<void> updateQuestionContext({
@@ -1882,6 +2440,72 @@ Future<void> _scrollTo(WidgetTester tester, Key key) async {
 }
 
 /// 使用真实引擎结果构造一个含完整三层标注与五星的档案。
+/// 构造 schema<3 的旧档案 JSON（仅含卦码与宫名，不含 palace_sequence），
+/// 用于验证从卦码补算宫内卦序。
+Map<String, dynamic> _legacyJson({
+  String baseCode = '111001',
+  String baseName = '山天大畜',
+  String basePalaceName = '艮',
+  String changedCode = '110001',
+  String changedName = '山泽损',
+}) {
+  const names = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'];
+
+  Map<String, dynamic> line(int position, {String? role}) {
+    return {
+      'position': position,
+      'position_name': names[position - 1],
+      'value': 7,
+      'yin_yang': 'yang',
+      'changing': false,
+      'six_god': '青龙',
+      'relation': '兄弟',
+      'heavenly_stem': '甲',
+      'earthly_branch': '子',
+      'gan_zhi': '甲子',
+      'element': '水',
+      if (role != null) 'role': role,
+    };
+  }
+
+  return {
+    'schema_version': 1,
+    'engine_version': 'legacy.0.9.0',
+    'meta': {
+      'cast_at': '2026-08-05T15:26:00+08:00',
+      'casting_method': 'manual',
+      'line_values': [7, 7, 7, 7, 7, 9],
+    },
+    'time': {'year': '丙午', 'month': '乙未', 'day': '辛亥', 'hour': '丙申'},
+    'hexagram': {
+      'base': {
+        'code': baseCode,
+        'name': baseName,
+        'palace_name': basePalaceName,
+        'palace_element': '土',
+        'lines': List.generate(6, (index) {
+          final position = index + 1;
+          return line(
+            position,
+            role: position == 5
+                ? '世'
+                : position == 2
+                ? '应'
+                : null,
+          );
+        }),
+      },
+      'changed': {
+        'code': changedCode,
+        'name': changedName,
+        'palace_name': '艮',
+        'palace_element': '土',
+        'lines': List.generate(6, (index) => line(index + 1)),
+      },
+    },
+  };
+}
+
 CaseDetail _engineCaseDetail() {
   final preview = CastPreview.fromEngineResult(
     liuyao_engine.manualCast(DateTime(2026, 8, 5, 15, 26), [9, 7, 7, 7, 7, 6]),

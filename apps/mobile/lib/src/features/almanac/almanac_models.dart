@@ -83,6 +83,7 @@ class AlmanacSnapshot {
     required this.currentTwoHourIndex,
     required this.wealthGodDirection,
     this.solarTerm,
+    this.twentyEightMansion,
   });
 
   /// 从 Dart 引擎结果创建 AlmanacSnapshot（离线模式）
@@ -128,6 +129,11 @@ class AlmanacSnapshot {
             )
             .toList(growable: false);
     final solarTerms = engineResult['solar_terms'] as Map<String, dynamic>?;
+    final providerExtensions =
+        engineResult['provider_extensions'] as Map<String, dynamic>?;
+    final mansion = (providerExtensions?['twenty_eight_mansion']
+            as Map<String, dynamic>?)
+        ?['name'] as String?;
 
     return AlmanacSnapshot(
       solarDate: DateTime(timestamp.year, timestamp.month, timestamp.day),
@@ -139,6 +145,7 @@ class AlmanacSnapshot {
       currentTwoHourIndex: engineResult['current_two_hour_index'] as int? ?? 0,
       wealthGodDirection: (wealthGod['direction'] as String?) ?? '南',
       solarTerm: solarTerms?['today'] as String?,
+      twentyEightMansion: mansion,
     );
   }
 
@@ -169,6 +176,7 @@ class AlmanacSnapshot {
       currentTwoHourIndex: json['current_two_hour_index'] as int,
       wealthGodDirection: wealthGod['direction'] as String,
       solarTerm: solarTerms['today'] as String?,
+      twentyEightMansion: json['twenty_eight_mansion'] as String?,
     );
   }
 
@@ -181,6 +189,9 @@ class AlmanacSnapshot {
   final int currentTwoHourIndex;
   final String wealthGodDirection;
   final String? solarTerm;
+
+  /// 当值二十八宿（如「室宿」），来自引擎 provider_extensions，可为空。
+  final String? twentyEightMansion;
 }
 
 class AlmanacLunarDate {
