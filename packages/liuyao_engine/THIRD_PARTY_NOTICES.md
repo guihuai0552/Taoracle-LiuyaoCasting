@@ -6,6 +6,7 @@
 - 精确提交：`8a944ada2f174c350a9fa69057597ecae5eb76be`
 - 许可证：MIT
 - 上游版权：Copyright (c) 2025 OPN48
+- 上游跟踪：本项目通过 fork [guihuai0552/cnlunar-](https://github.com/guihuai0552/cnlunar-) 跟踪上游变更（Python 对照服务锁定 PyPI `cnlunar==0.2.0`）
 
 本包的农历月数据、二十四节气数据和相关历法算法以该提交为移植基线。该提交相对
 `v0.2.0` 标签只修改了 `LICENSE`，算法与数据文件没有变化。

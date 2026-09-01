@@ -110,9 +110,22 @@ docs/
 - 所有排盘规则改动先进入 `packages/liuyao_engine`，通过 Python↔Dart 对照后再动 UI；Widget 不得自算业务规则。
 - 规则争议先读 [docs/README.md](docs/README.md) 的治理流程，并同步 [规则来源登记表](docs/rules/source-register.md)。
 
+##  开源依赖与致谢
+
+本项目站在以下开源项目之上（采用的精确版本、提交与完整许可声明见 [THIRD_PARTY_NOTICES.md](packages/liuyao_engine/THIRD_PARTY_NOTICES.md)）：
+
+| 项目 | 许可证 | 在本项目中的角色 |
+|---|---|---|
+| [OPN48/cnlunar](https://github.com/OPN48/cnlunar) | MIT | **万年历核心**——农历、二十四节气、四柱、纳音、财神方位等历法算法的移植基线；生产端为纯 Dart 精确移植，运行时不依赖 Python |
+| [6tail/lunar-python](https://github.com/6tail/lunar-python) | MIT | 1901–2099 年精确交节时间的对照来源，用于跨实现核验 |
+| [kentang2017/najia](https://github.com/kentang2017/najia) | MIT | 纳甲装卦规则的 Python 对照实现，仅用于回归测试，不随产品分发 |
+| [ButCornB/KingHwa-OldSongfont](https://github.com/ButCornB/KingHwa-OldSongfont) | OFL-1.1 | 「京华老宋体」——App 卦面导出排版字体（GB2312 子集） |
+
+感谢以上项目的作者与维护者。
+
 ##  许可证
 
-[MIT](LICENSE)。引擎中 cnlunar 移植部分的第三方许可声明见 [THIRD_PARTY_NOTICES.md](packages/liuyao_engine/THIRD_PARTY_NOTICES.md)。
+[MIT](LICENSE)。第三方开源依赖的许可声明见 [THIRD_PARTY_NOTICES.md](packages/liuyao_engine/THIRD_PARTY_NOTICES.md)。
 
 ---
 
