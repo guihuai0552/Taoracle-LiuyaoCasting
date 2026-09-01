@@ -7,6 +7,16 @@
 
 完全离线的六爻排盘与案例存档工具。基于**京房八宫纳甲体系**装卦，排盘结果完整可追溯，档案本地保存、可导出、可迁移——不依赖任何网络服务、账号或模型 API。
 
+##  下载安装
+
+普通用户无需自行构建，直接从 [Releases](https://github.com/guihuai0552/Taoracle-LiuyaoCasting/releases/latest) 下载 APK 安装：
+
+[![下载 APK](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD-APK%20v1.16.0-2EA44F?style=for-the-badge&logo=android)](https://github.com/guihuai0552/Taoracle-LiuyaoCasting/releases/latest)
+
+- 安装包为 arm64-v8a 架构，适用主流 64 位 Android 手机；
+- 应用不申请网络权限，安装后完全离线运行；
+- 首次安装需按系统提示允许「安装未知来源应用」。
+
 ##  功能特性
 
 - **万年历** —— 1901–2100 年农历、精确交节四柱（立春换年、十二节换月，精确到秒）、纳音、旬空、13 时辰、值日二十八宿、二十四节气与财神方位。
