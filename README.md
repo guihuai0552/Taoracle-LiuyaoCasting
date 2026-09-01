@@ -1,20 +1,44 @@
-# 六爻排盘与存档
+# 道谕六爻 · Taoracle LiuyaoCasting
 
-完全离线的 Flutter Android 六爻工具。当前产品不包含 Agent、模型 API、账号或云端服务；安装 APK 后，万年历、排盘、自动存档、解读、反馈、图片导出与跨设备文件迁移均在设备内完成。
+[![Flutter](https://img.shields.io/badge/Flutter-Android-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/engine-pure%20Dart-0175C2?logo=dart&logoColor=white)](https://dart.dev)
+[![Offline](https://img.shields.io/badge/%E8%BF%90%E8%A1%8C-%E5%AE%8C%E5%85%A8%E7%A6%BB%E7%BA%BF-2EA44F)](https://github.com/guihuai0552/Taoracle-LiuyaoCasting)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## 架构
+完全离线的 Android 六爻排盘与案例存档工具。基于**京房八宫纳甲体系**装卦，排盘结果完整可追溯，档案本地保存、可导出、可迁移——不依赖任何网络服务、账号或模型 API。
+
+## ✨ 功能特性
+
+- **万年历** —— 1901–2100 年农历、精确交节四柱（立春换年、十二节换月，精确到秒）、纳音、旬空、13 时辰、值日二十八宿、二十四节气与财神方位。
+- **起卦** —— 手动逐爻录入与三枚铜钱自动摇卦，爻序固定为初爻至上爻。
+- **完整卦面** —— 本卦 / 变卦各自的卦宫与世应、纳甲、六亲、六神；按宫卦 / 错卦规则排出的完整伏卦与伏神；本卦、伏卦、变卦三层五行十二长生与京房二十八宿；驿马、桃花、禄神、华盖、天乙贵人五项神煞与卦身、命爻。
+- **可追溯计算** —— 每个标注都能展开「起点 → 查表/步进 → 命中地支 → 命中爻位」的完整 `calculation_trace`。
+- **案例档案** —— 排盘后自动保存完整 JSON 快照；支持搜索、解读版本、反馈、单档 Markdown / JSON / PNG 导出，以及跨设备批量迁移。
+- **隐私与离线** —— 无 INTERNET 权限、无遥测、无云端；所有数据存于设备私有目录，卸载前可导出迁移包。
+
+排盘遵循的规则体系、底本出处与治理原则见 **[RULES.md](RULES.md)**。
+
+## 🏗️ 架构
 
 ```text
-packages/liuyao_engine/  纯 Dart 六爻 + cnlunar 精确移植（生产唯一算法源）
-apps/mobile/             Flutter UI、设备端档案、系统分享
-services/liuyao-engine/  Python 权威对照与研究实现（仅开发/测试）
-services/agent/          历史服务端参考，不进入当前运行路径
-scripts/                 跨语言与断网发布门禁
+packages/liuyao_engine/   纯 Dart 排盘与万年历引擎（生产唯一算法源，无 Flutter/网络依赖）
+apps/mobile/              Flutter Android 客户端（UI、设备端档案、系统分享）
+services/liuyao-engine/   Python 权威对照实现（仅开发/测试，用于跨语言 parity 验证）
+scripts/                  跨语言对照与断网发布门禁脚本
+docs/                     产品、规则、规格与决策文档中心
 ```
 
-`liuyao_engine` 当前输出 schema v16，包含本卦/变卦各自卦宫与世应、纳甲、逐爻纳音、六亲、六神、用户确认的完整伏卦/伏神、本伏变三层十二长生与京房二十八宿、五项神煞、卦身/命爻、私有参考合同及完整计算轨迹。万年历支持 1901-02-19 至 2100-02-08，提供农历、精确交节四柱、纳音、四柱旬空、13 时辰、值日宿、二十四节气和财神方位。
+引擎当前输出 **schema v16**：本卦/变卦各自卦宫世应、纳甲、逐爻纳音、六亲、六神、用户确认口径的完整伏卦/伏神、本伏变三层十二长生与京房二十八宿、五项神煞、卦身/命爻、私有参考合同及完整计算轨迹。
 
-## 启动
+## 🚀 快速开始
+
+### 前置要求
+
+- Flutter SDK（含 Android 工具链）
+- Dart SDK `^3.12`
+- Python 3（仅运行对照与门禁脚本时需要）
+
+### 运行 App
 
 ```bash
 cd apps/mobile
@@ -22,35 +46,74 @@ flutter pub get
 flutter run
 ```
 
-不需要启动 Node、Python、数据库或配置环境变量。
+不需要启动 Node、数据库，不需要配置任何环境变量或 API Key。
 
-本轮可安装审阅包：[六爻分析存档-三层长生星宿-v1.5.0.apk](六爻分析存档-三层长生星宿-v1.5.0.apk)。它是 `1.5.0+7` 完全离线 release 构建，包含 schema v16 本卦/伏卦/变卦三层十二长生与京房逐爻宿、七项选定标注和本变卦各自世应，并保留完整档案、批量迁移及 PNG 长图导出；当前使用 Android Debug 证书签名，仅用于安装审阅，不能直接上架。SHA-256：`db75e6a2ec2b517831700dc64dabb5b678bfe17db5de728c1ad775be1c753609`。
-
-## 验证
+### 构建 Release APK
 
 ```bash
-cd packages/liuyao_engine
-dart analyze
-dart test
+cd apps/mobile
+flutter build apk --release
+```
 
-cd ../../apps/mobile
-dart analyze
-flutter test
+发布 APK 必须通过断网门禁检查（校验无网络权限、无远程调用）：
 
-cd ../..
-services/liuyao-engine/.venv/bin/python scripts/check_offline_almanac_parity.py
-services/liuyao-engine/.venv/bin/python scripts/check_offline_liuyao_structure_parity.py
-services/liuyao-engine/.venv/bin/python scripts/check_offline_liuyao_annotation_parity.py
-/Users/feiwu4/Documents/vibecoding/liuyao/.venv/bin/python \
-  scripts/check_private_reference_dart_parity.py
+```bash
 python3 scripts/check_offline_mobile_release.py \
   --apk apps/mobile/build/app/outputs/flutter-apk/app-release.apk
 ```
 
-除既有跨语言矩阵外，新增私有参考的 64 卦完整 plate、60 纳音、144 项十二长生、固定动爻合同和 2,388 个精确交节“前一秒/当秒”边界验证。
+## ✅ 测试与验证
 
-## 档案
+```bash
+# 引擎单元测试
+cd packages/liuyao_engine && dart analyze && dart test
 
-排盘完成后自动保存当前完整 JSON 快照并进入独立卦面页。设备端存储使用 App 私有持久目录中的带 schema 原子 JSON 容器；退出后台、划掉任务或系统结束进程都不会清除。它支持旧版根对象迁移、写入中断恢复、损坏副本保留、解读乐观锁、反馈编辑，单档 Markdown/JSON/PNG 导出，以及完整批量迁移包的安全合并或清空恢复。卸载应用或在系统设置主动清除应用数据才会删除档案，因此卸载前应先导出迁移包。
+# App 测试
+cd apps/mobile && dart analyze && flutter test
 
-文档入口见 [docs/README.md](docs/README.md)。
+# 跨语言对照门禁（先在 services/liuyao-engine 安装依赖：cd services/liuyao-engine && uv sync）
+services/liuyao-engine/.venv/bin/python scripts/check_offline_almanac_parity.py
+services/liuyao-engine/.venv/bin/python scripts/check_offline_liuyao_structure_parity.py
+services/liuyao-engine/.venv/bin/python scripts/check_offline_liuyao_annotation_parity.py
+```
+
+验证矩阵覆盖：64 卦完整卦盘、60 纳音、144 项十二长生、固定动爻合同，以及 2,388 个精确交节「前一秒 / 当秒」边界。
+
+## 📐 目录结构
+
+```text
+packages/liuyao_engine/      # 排盘引擎（算法唯一源）
+apps/mobile/                 # Flutter 客户端
+  └─ lib/src/
+      ├─ engine/             # 引擎适配层
+      ├─ features/           # 万年历 / 起卦 / 卦面 / 档案 / 设置
+      └─ ui/                 # 设计系统与通用组件
+services/liuyao-engine/      # Python 对照实现（开发用）
+scripts/                     # parity 与发布门禁
+docs/
+  ├─ rules/                  # 规则文档：八宫伏卦、二十八宿、来源登记…
+  ├─ specs/                  # SPEC-001~008 功能规格
+  ├─ product/                # PRD
+  └─ decisions/              # ADR 与决策日志
+```
+
+## 📚 文档
+
+- **[RULES.md](RULES.md)** —— 排盘规则遵循说明（先读这个）
+- [文档中心](docs/README.md) —— 单一事实源入口
+- [规则来源登记表](docs/rules/source-register.md) —— 每条规则的出处、等级与采用状态
+- [项目术语表](docs/rules/glossary.md) —— 排盘、本伏、值日宿等核心名词
+
+## 🤝 贡献
+
+- 提交信息使用 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)，例如 `feat: add archive detail page`。
+- 所有排盘规则改动先进入 `packages/liuyao_engine`，通过 Python↔Dart 对照后再动 UI；Widget 不得自算业务规则。
+- 规则争议先读 [docs/README.md](docs/README.md) 的治理流程，并同步 [规则来源登记表](docs/rules/source-register.md)。
+
+## 📄 许可证
+
+[MIT](LICENSE)。引擎中 cnlunar 移植部分的第三方许可声明见 [THIRD_PARTY_NOTICES.md](packages/liuyao_engine/THIRD_PARTY_NOTICES.md)。
+
+---
+
+*本项目只做排盘计算与位置标注，不生成吉凶结论；解读由使用者自行完成并存档。*

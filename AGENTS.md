@@ -5,7 +5,6 @@
 - `packages/liuyao_engine`：唯一生产排盘与万年历实现。纯 Dart、无 Flutter/网络依赖。
 - `apps/mobile`：Flutter Android 客户端，负责 UI、设备端状态、原子 JSON 档案与系统分享。
 - `services/liuyao-engine`：Python + cnlunar + Najia 权威对照实现，只用于规则研究、golden/parity 测试，不进入 APK，也不是 App 运行依赖。
-- `services/agent`：历史服务端参考实现，不属于当前离线产品运行路径。
 - 不要把 API Key、OAuth Token、服务地址或会话文件打包进 Flutter 应用。
 - 所有新排盘规则先进入独立 Dart 包，并通过 Python↔Dart 对照；Widget 不得自算业务规则。
 
@@ -30,7 +29,7 @@ flutter run
 services/liuyao-engine/.venv/bin/python scripts/check_offline_almanac_parity.py
 services/liuyao-engine/.venv/bin/python scripts/check_offline_liuyao_structure_parity.py
 services/liuyao-engine/.venv/bin/python scripts/check_offline_liuyao_annotation_parity.py
-python3 scripts/check_offline_mobile_release.py
+python3 scripts/check_offline_mobile_release.py --apk <release-apk-path>
 ```
 
 ## 质量要求

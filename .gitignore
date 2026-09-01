@@ -3,8 +3,6 @@
 .idea/
 .vscode/
 .env
-services/agent/.data/
-services/agent/dist/
 services/liuyao-engine/.venv/
 __pycache__/
 *.py[cod]
@@ -12,3 +10,29 @@ node_modules/
 *.apk
 .worktrees/
 conversations/
+
+# ---- 以下为本地保留、不随仓库分发的内部资料 ----
+
+# 对标产品截图与对标记录（涉及第三方产品界面，仅内部使用）
+docs/assets/ui-reference/
+docs/product/ui-benchmark-lingguang-xiangji.md
+
+# 历史服务端参考实现（不进入当前离线产品运行路径）
+services/agent/
+
+# 设计草稿与历史迭代资产（本地保留）
+/wireframe-preview*.html
+/daoyu-sixyao-ui-optimized.html
+/design-system-v1.0.md
+/design-system-v1.0-icons/
+/design-system-v1.0-mockups/
+/style-proof/
+/skill-designsystem/
+/nocturne-almanac-skill/
+/nocturne-almanac-skill.zip
+/__MACOSX/
+/导出样张-*.png
+docs/archive-design-system-v0.1-v0.6/
+docs/assets/v0.8-concepts/
+docs/design-system-v0.7-night-almanac.md
+docs/design-system-v0.8-paper-instrument.md

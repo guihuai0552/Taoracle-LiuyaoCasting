@@ -50,7 +50,7 @@ SOFTWARE.
 
 ## 用户提供的 `liuyao-private`
 
-- 私有来源：`/Users/feiwu4/Documents/vibecoding/liuyao-private`
+- 私有来源：仓库外维护的 `liuyao-private` 本地副本（通过 `LIUYAO_PRIVATE_ROOT` 环境变量指定）
 - 精确提交：`6ca3d3e`
 - 仓库声明许可证：MIT
 

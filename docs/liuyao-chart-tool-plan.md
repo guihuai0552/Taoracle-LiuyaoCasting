@@ -382,4 +382,4 @@ Flutter App
 
 - [中国哲学书电子化计划：《京氏易传》](https://ctext.org/jingshi-yizhuan/zhs)
 - [维基文库：《京氏易传》](https://zh.wikisource.org/zh-hans/%E4%BA%AC%E6%B0%8F%E6%98%93%E5%82%B3)
-- [Taoracle 六爻服务目录](/Users/feiwu4/Documents/vibecoding/Taoracle-master/src-backend/app/services/liuyao)
+- Taoracle 六爻服务目录（仓库外本地副本）

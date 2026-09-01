@@ -27,10 +27,9 @@ final chart = manualCast(
 规则依据、冲突决策、伏卦与二十八宿说明、跨语言验证方法由主仓库 `docs/` 维护。私有
 副本只作为 C 级可执行对照；它未实现的其余神煞和天文五星不会被臆造。
 
-```bash
-/Users/feiwu4/Documents/vibecoding/liuyao/.venv/bin/python \
-  scripts/check_private_reference_dart_parity.py
-```
+私有参考对照脚本 `scripts/check_private_reference_dart_parity.py` 依赖仓库外维护的本
+地 `liuyao-private` 副本环境，不随开源仓库提供；外部使用者可运行其余三条公开 parity
+门禁。
 
 当前包尚未发布到 pub.dev；待项目所有者确认本项目自身的开源许可证和正式仓库地址后再解除
 `publish_to: none`。其中 cnlunar 移植内容精确锚定上游提交

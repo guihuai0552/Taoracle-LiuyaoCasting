@@ -2,7 +2,7 @@
 
 > 状态：`Implemented / Audited`  
 > 日期：2026-08-07  
-> 参考副本：`/Users/feiwu4/Documents/vibecoding/liuyao-private`  
+> 参考副本：仓库外维护的 `liuyao-private` 本地副本（`LIUYAO_PRIVATE_ROOT`）  
 > 固定提交：`6ca3d3e`  
 > 规则：该副本是可执行对照，不是传统规则的最终权威。
 
@@ -47,7 +47,7 @@ Flutter 应用直接调用。移植不是“照抄即真理”：凡与现有合
 复现命令：
 
 ```bash
-/Users/feiwu4/Documents/vibecoding/liuyao/.venv/bin/python \
+LIUYAO_PRIVATE_ROOT=<本地副本路径> python3 \
   scripts/check_private_reference_dart_parity.py
 ```
 
@@ -55,7 +55,7 @@ Flutter 应用直接调用。移植不是“照抄即真理”：凡与现有合
 和内容 revision：
 
 ```bash
-/Users/feiwu4/Documents/vibecoding/liuyao/.venv/bin/python \
+LIUYAO_PRIVATE_ROOT=<本地副本路径> python3 \
   scripts/generate_exact_jie_table.py
 ```
 

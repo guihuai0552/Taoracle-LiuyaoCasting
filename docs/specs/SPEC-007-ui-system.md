@@ -3,7 +3,7 @@
 > 状态：`Implemented / Awaiting Visual Review`  
 > 版本：1.9  
 > 最近更新：2026-08-07  
-> 依赖：[UI 对标记录](../product/ui-benchmark-lingguang-xiangji.md)、全部页面 Spec
+> 依赖：UI 对标记录（内部资料，不随开源仓库分发）、全部页面 Spec
 
 ## 1. 目的
 
@@ -99,15 +99,17 @@
 
 ## 9. 已有 UI 证据
 
+> 对标截图与对标记录属内部参考资料，涉及第三方产品界面，**不随开源仓库分发**；下表仅保留证据编号与用途登记。
+
 | 证据 | 覆盖页面 | 当前用途 |
 |---|---|---|
-| [LG-20260805-01](../assets/ui-reference/calendar-month-2026-08.jpg) | 月历、日详情、底部导航 | 月历信息密度与卡片层级 |
-| [LG-20260805-02](../assets/ui-reference/chart-calendar-linked-2026-08.jpg) | 卦面 + 月历 | 上下文联动与高阶信息分层 |
-| [LG-20260805-03](../assets/ui-reference/manual-casting-reference.jpg) | 手动起卦 | 表单顺序、六行编辑、主次按钮 |
-| [LG-20260805-04](../assets/ui-reference/result-detail-reference.jpg) | 独立卦面/档案详情 | 页面层级、卡片顺序、折叠解读与反馈 |
-| [LG-20260806-05](../assets/ui-reference/archive-card-layout.png) | 档案列表 | 分类印记、占问、时间和之卦的三块网格 |
-| [LG-20260806-06](../assets/ui-reference/chart-row-hierarchy.png) | 卦面账页 | 单爻主副字号、本变同行、动爻和世应位置 |
-| [LG-20260806-07](../assets/ui-reference/chart-detail-card-hierarchy.jpg) | 04A 卦面详情 | 十二/神煞摘要、四柱旬空、本变卦和六爻大卡层级 |
+| LG-20260805-01 | 月历、日详情、底部导航 | 月历信息密度与卡片层级 |
+| LG-20260805-02 | 卦面 + 月历 | 上下文联动与高阶信息分层 |
+| LG-20260805-03 | 手动起卦 | 表单顺序、六行编辑、主次按钮 |
+| LG-20260805-04 | 独立卦面/档案详情 | 页面层级、卡片顺序、折叠解读与反馈 |
+| LG-20260806-05 | 档案列表 | 分类印记、占问、时间和之卦的三块网格 |
+| LG-20260806-06 | 卦面账页 | 单爻主副字号、本变同行、动爻和世应位置 |
+| LG-20260806-07 | 04A 卦面详情 | 十二/神煞摘要、四柱旬空、本变卦和六爻大卡层级 |
 
 ## 10. 变更记录
 

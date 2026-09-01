@@ -2,6 +2,99 @@
 
 > 本日志记录项目语义变化；细小错别字和纯格式调整可合并记录。
 
+## 2026-08-29（第八批：道谕六爻 · 依据线框图切换浅色朱红体系）
+
+- **全局主题换肤（Nocturne 暗色 → 浅色朱红）**：`DSColors` 门面重写为线框图确认的浅色朱红 token（暖白底 `#F3F2EF` × 纯白卡片 × 朱红主强调 `#A9282D` × 棕金辅助 `#AE8648` × 浓墨正文 `#202020`）；五行色保留不动（卦面专业核心载体）。新增 `buildDaoyuTheme()` 浅色朱红主题并接线 `buildLiuyaoTheme()`；`LiuyaoPaperBackground` 切浅色暖白底；`DSDaoyuBackground` 纯色背景。全项目 459 处门面引用零改动整体换肤，底部导航选中指示、按钮、卡片、输入框、开关随门面自动变朱红。
+- **页面级微调**：日历页时辰条选中态由深色实心块改为朱红强调块 + 反白字（贴线框图红色选中框）；日历选中日朱红圆角框 + 白字、今天朱红描边经核验已符合线框图。
+- **卦面信息核对（极大保留）**：审计确认排盘页完整保留 四柱干支、纳音五行、旬空（年月日时四空）、十二长生、神煞、五星（岁星/荧惑/镇星/太白/辰星）、二十八宿（世爻宿 + 64 卦序）、卦宫卦序、六亲、六神、世应、伏神、动爻变爻、阴阳爻，爻位下方可切换标注层。六冲/六合已补入引擎（见第八批补充）；用神/忌神/原神/仇神仍属引擎能力边界（需先定义取用规则，UI 不硬造数据）。
+- **品牌与产品边界**：全库零「灵光象吉 / 金口诀 / 会员 / VIP」残留；`MaterialApp` 系统标题与档案详情 AppBar 标题统一为「道谕六爻」；起卦页「六爻」朱红标签符合线框图；设置页保持产品实际（历法口径/卦面显示/本地数据/数据边界，无会员功能）。
+- 回归：`dart analyze` 零错误（仅 5 项改造前既有 warning）；**85 项 Flutter 测试全过**（含起卦/排盘/档案/导出 PNG/历法口径全链路）；对比度排查无「白字白卡」隐患。
+
+### 第八批补充 · 卦面补全：六冲 / 六合（v1.13.x）
+
+- **引擎层**（`liuyao_engine/src/hexagram.dart`）：新增六冲卦码集合（8 纯卦 + 天雷无妄 + 雷天大壮，共 10 卦）与六合卦码集合（否/泰/萃/临/蹇/损/晋/明夷，共 8 卦）；新增 `hexagramProperty(code)` 返回 `六冲` / `六合` / null；`buildBaseChart` 的 base 与 changed 输出新增 `liu_chong` / `liu_he` / `hexagram_property` 字段，旧数据缺失时解析回退 false/null，不破坏既有档案。
+- **模型层**（`casting_models.dart`）：`BaseHexagram` / `ChangedHexagram` 新增 `liuChong` / `liuHe` / `hexagramProperty` 字段并容错解析。
+- **UI 层**（`chart_preview.dart`）：卦面头部宫位行追加「· 六冲 / 六合」后缀；卦面信息标签新增朱红强调的「六冲」「六合」「变六冲」「变六合」MetaTag；本卦/变卦对比标题块的宫位文字同步追加「（六冲）/（六合）」。
+- **测试**：引擎新增 2 组用例（卦码全集判断 + 乾之坤六冲联动 / 天地否六合静卦 / 山天大畜无属性），引擎测试 21 项全过；Flutter 侧 `dart analyze` 0 error、85 项测试全过。
+
+### 第八批补充 · 排盘结果页信息密度压缩（对照线框图精简）
+
+- **顶部信息卡压缩**（`case_detail_page.dart` `_QuestionCard`）：内边距收窄、日期行 13→12px、占问行 16→14px、背景问念与标签间距 8→6px、取卦方法行 11→10px、编辑按钮 compact——卡片整体高度显著下降，接近线框图 CaseInfo 两行结构。
+- **卦面头部精简**（`chart_preview.dart`）：
+  - 本卦/变卦卦名 20→15px（`_HexagramTitleBlock`）；
+  - 删除「伏卦：名称 / X宫规则」头部行（`_HiddenHexagramIdentityLine` 整类移除；伏神信息仍保留在卦面表格「伏神」列，信息不丢）；
+  - 删除「京房宿：世爻X宿 / 64卦序」摘要卡（`_MansionWorldSummary` 整类移除）。
+- **测试**：widget 测试同步更新——`hidden-hexagram-summary`、`mansion-world-summary`、伏卦名「坤为地」断言改为 findsNothing，锁定新精简布局；85 项 Flutter 测试全过、`dart analyze lib` 零错误。
+- 十二长生、神煞折叠卡保持不动（用户确认无问题）。
+
+### 第八批补充 · 当值星宿上日历页（引擎数据补消费）
+
+- **模型层**（`almanac_models.dart`）：`AlmanacSnapshot` 新增 `twentyEightMansion` 字段；`fromEngineResult` 解析引擎 `provider_extensions.twenty_eight_mansion.name`（如「室火猪」），`fromJson` 同步支持旧数据缺失回退 null。
+- **UI 层**（`almanac_page.dart`）：日历选中日详情区的「财神方位」卡升级为两栏摘要卡——左栏财神方位、右栏「当值星宿」+ 宿名，中间 1px 发丝分隔；当值星宿为空时回退原单栏财神样式，向后兼容。
+- **测试**：`_FakeAlmanacDataSource` 注入「室火猪」，渲染测试新增「当值星宿」「室火猪」断言；85 项 Flutter 测试全过、`dart analyze lib` 零错误。
+
+### 第八批补充 · 线框图逐页审计修复（四页并行审计 + 收敛）
+
+- **排盘结果页卦面信息补全**：①六神按五行配色（青龙木/朱雀火/白虎金/玄武水/勾陈腾蛇土，`_sixGodColor`）；②世应分色（世=暗红 `celadonDeep`、应=浅灰 `textFaint`，本卦与变卦统一）；③旬空补柱名前缀「年空/月空/日空/时空：干支」且日空红字突出；④新增「— 仅供娱乐 —」页脚；⑤起卦日期改中文格式「2026年08月17日 17:34:18」；⑥十二长生折叠摘要取日柱四阶段（长生/帝旺/墓/绝）实值。
+- **档案页对齐线框**：标题「六爻档案」→「道谕六爻」；元信息行改单行灰（日期 + 本卦 之 变卦），分隔线移到元信息与标签之间；卦变连接符「→」→「之」；标签胶囊由红色系改金色描边白底（对齐线框 `#c7ad7e`）。
+- **日历页选中态**：时辰选中由实底白字块改为「红框圈出」（淡朱红底 + 1.2px 红描边 + 红字加粗），与日期选中态区分。
+- **起卦页主按钮**：6 处主 CTA 由棕金 `jade` 改朱红 `cinnabar`（排盘/开始摇卦/确认），符合线框红底白字主操作。
+- **设置页卦面显示四开关**：`AppPreferences` 新增 `showNayin / showFiveStarsAndMansions / showShenshaAndTwelveGrowth / showAuxAlmanac`（默认全开，卦面信息极大保留）；设置页卦面显示卡新增 4 个开关并持久化；排盘详情页 initState 按偏好初始化标注默认值。
+- **全局圆角**：`LiuyaoRadii.card` 12→16，18 处卡片统一更大圆角（对齐线框 17px 契约）。
+- 清理：删除 `_selectorStyle` 死代码、`_dayHint/_monthHint` 未用 getter、`_YaoLineShape` 未用 key 参数；`Switch.activeColor` → `activeThumbColor`。`dart analyze lib` **No issues found**（零 error 零 warning）；**85 项 Flutter 测试全过**。
+
+## 2026-08-24（第七批：回滚「当代文人极简」— 恢复浅色仪器主题）
+
+- **全面回滚第六批视觉改造**：应用户要求恢复至 v1.10.0「浅色仪器」视觉（宣纸米白 + 玉玻璃 + 青铜/朱砂强调 + 仪器网格背景）。恢复途径：worktree（8 月 20 日原版）直接还原 tokens/components/effects；ds_colors 浅色主值与 app_theme 按 v1.10.0 源文重建，暗色体系原样保存于 DSColorsDark；features 层用行级 difflib 配对（norm 后相同的行=纯视觉改动 → 恢复，功能行全部保留），合计恢复 102 行 + 结构级还原（神煞/十二长生深棕面板、_ChartHeader/_DarkTag 的 light 双态与默认值、金色 _mansionPaper、朱砂主按钮、w800/w900 字重）。
+- **保留的功能（第四/五批）不受影响**：设置页重构、历法口径、AppPreferences 显示开关、case_detail 动效、纳音五行配色、legacy 卦序补算等全部在位。
+- 回归：dart analyze 6 项既有警告、**83 项 Flutter 测试全过**；审计确认原版特征全部恢复（w800×69 / w900×13 / 深棕面板×2 / 朱砂按钮×7 / 辉光令牌×15），新版特征清零（青瓷 0 处）。
+
+## 2026-08-24（第六批：Design System v2 「当代文人极简」落地 — 全局视觉体系切换）
+
+- **设计语言彻底换轨**：废除旧「青铜仪器 + 玻璃辉光 + 精密网格」体系，按 docs/design-system-v0.2 ~ v0.6 规范落地「当代文人极简（宣纸 + 墨 + 青瓷 + 克制朱砂）」。tokens / 组件 / 全局主题 / 语义别名层全部重写，页面代码经兼容别名零成本切换。
+- **阴影令牌清零**（ds_shadow.dart）：ambient / panel 一律空列表；仅保留 overlay 一笔 8% 浓墨极轻投影（弹层专用）；四种 glow 辉光令牌全部置空。层级 = 1px 发丝边框 + 背景色差。
+- **圆角收敛 8–16**（ds_radius.dart）：lg 20→12、md 14→10、新增 xxs=4；全系统最大圆角 16（底部抽屉顶角），告别 Material You 式大圆角。
+- **Linear 式字阶**（ds_typography.dart）：四级字重 400/500/600/700 + 八级字号 28/22/18/15/14/12/11/10，附全套 TextStyle（displayStyle~microStyle）；衬线标题（Songti SC 链）+ 无衬线正文。
+- **全局字重批量收敛**：92 处 w900→w700、w800→w600（覆盖 casting/archive/almanac/settings 全部页面），重墨压迫感消除。
+- **组件改造**：DSButton 高度 48→40、primary 改青瓷实底、ritual 改青瓷描边（去辉光）；DSBadge 改 wash 淡底 + w600、新增 accent/positive 语义 tone；DSInstrumentPanel 删除仪器网格/状态灯/辉光，改纯纸面 + 发丝分隔线；DSHexagramLine 动爻/世应由「辉光带」改「朱砂/青瓷整行淡底 + 呼吸」；DSGlowPulse 由 boxShadow 辉光改淡底呼吸。
+- **主题与背景**（app_theme.dart）：ColorScheme 主色青铜→青瓷 #3D5A5B；卡片/弹层/导航/开关/输入框全部纸面化 + 1px 边框；DSInstrumentBackground 删除网格/刻度标尺/天盘弧线，改极淡顶部纸光渐变；标题字重映射上限 700。
+- **语义层清理**（liuyao_design.dart）：删除 _legacyLiuyaoTheme 死代码（约 130 行）；印章 LiuyaoSealMark 字重 w900→w700、字号收敛；卡片边框统一 1px。
+- **demo 预览页文案同步**为文人极简口径（纸面板 / 朱砂淡底 / 呼吸纸底）。
+- **页面层深度清障（chart_preview / case_detail / archive / 三个起卦页）**：神煞面板去深棕底改纸面；_ChartHeader/_DarkTag 的 light 参数默认翻转（纸面为默认形态），深墨底/22 圆角/阴影分支全部移除；京房五星五行色改用 DSColors 低饱和五行令牌；摇卦/排盘主按钮朱砂→青瓷（朱砂仅留警示）；硬币与标记块的硬编码深棕/米棕全部换语义色；模式胶囊墨底→青瓷；导出图卡片圆角 22→12。硬编码金色 _mansionPaper 移除。至此全局零 w800/w900、零大圆角、features 层零 boxShadow、零深底硬编码。
+- 回归：dart analyze 零错误零新增警告（6 项均为改造前既有 info/warning）；**83 项 Flutter 测试全过**（9~11 秒）；dart format 通过。
+- 生成离线安装包 `六爻分析存档-当代文人极简设计系统-v1.11.0.apk`（57.0MB，version 1.11.0+14），SHA-256 前 16 位 `20b6a84eca5cf903`；APK 离线门禁通过（无网络权限）。
+
+## 2026-08-20（第五批：纳音五行配色 / 旧档案卦序补算 / 历法口径卡片隐藏）
+
+- **纳音按五行配色**：卦面爻位标注行的纳音文字由固定墨色改为按纳音五行着色。新增 `_nayinColor`：取纳音名尾字「金木水火土」映射五行色（如「海中金」→ 金 → metal 色、「炉中火」→ 火），伏神/变卦等 muted 层降饱和（alpha 0.55），无法识别或空值回退墨色。
+- **旧档案卦序补算**：schema<3 的 legacy 档案此前 `palaceSequence` 恒为 0，卦面头部显示「宫·序位未记录」。现 `_legacyPalaceSequence` 优先读存储的 `palace_sequence`、缺失或为 0 时从卦码用 `calculateShiYing` 按京房八宫寻世诀补算（本卦与变卦均覆盖）；`hasCanonicalPalaceSequence` 兼容 `palaceSequence > 0`，使旧档案头部也能显示「乾宫·3」式宫内卦序。引擎已对照标准京房八宫六十四卦表逐卦验证全部一致（64/64）。
+- **历法口径卡片隐藏**：首次历法口径选择完成后（`calendarPolicySetupCompleted=true`），手动起卦页不再显示「历法口径」摘要卡（口径由设置页统一管理）；起卦仍从全局偏好读取并随档案存档，未设置时卡片保留作为入口。
+- 新增测试 3 项：legacy 卦序补算（山天大畜艮宫3 / 山泽损艮宫4）、纳音五行色断言（泽天夬初爻甲子「海中金」= metal 色）、历法口径卡片按首次设置状态显隐。
+- 回归：移动端 **83 项 Flutter 测试**、引擎 **19 项 Dart 测试**、Python 62 项（205 子测试）、Node 6 项全过；almanac parity 16115 快照、annotation parity 3840 快照、structure parity 4096 组、离线源码与 APK 离线门禁通过；dart format 通过。
+- 生成离线安装包 `六爻分析存档-卦面细节优化-v1.10.0.apk`（57.1MB，version 1.10.0+13），SHA-256 `67d67881...cc375e`；APK 离线门禁通过（无网络权限）。
+
+## 2026-08-20（第四批：界面优化收尾 — 浅色仪器主题 / 首次历法口径弹窗 / 显示开关默认关闭 / 动效接入 / 测试挂起修复）
+
+- **主题反转：浅色为主、暗色作氛围**。`DSColors` 反转为浅色令牌（宣纸米白底 `#F2EEE4`、半透明白玉玻璃、深墨文本、朱砂强调、青铜次强调），暗色原值保存为 `DSColorsDark` 作第二套主题底座；`buildOrientalInstrumentTheme()` 由 `ThemeData.dark` 改为 `ThemeData.light` + `ColorScheme.light`；`app.dart` 状态栏改为深色文字。卦面神煞/身命等深色「仪器面板」保留为局部氛围渲染，文字对比度已核查。
+- **首次历法口径弹窗**：`HomeShell` 首次进入六爻 tab 且 `calendarPolicySetupCompleted=false` 时弹出玻璃材质口径选择弹窗（交日/交月两组规则卡 + 摘要 + 确认），确认后持久化不再弹出，取消回退日历 tab；三个起卦页读取全局口径，手动起卦页口径卡改为只读摘要。
+- **卦面默认显示策略**：`AppPreferences` 新增 `showCastingRecord(false)` / `showCalculationBasis(false)`，卦面详情默认隐藏「起卦记录」「计算依据」，设置页提供独立开关即时生效。
+- **设置页仪器风**：重构为玻璃分组卡片，「历法口径」组（当前值 + 修改入口 + 仅影响后续起卦提示）、「卦面显示」组（两个 Switch）、「设计系统预览」入口保留。
+- **卦面动效**：`case_detail_page` 卦面区块接入 `DSReveal / DSScaleIn` 入场，`_ResultExpansionCard` 使用玻璃卡 + `ExpansionTile` 展开/收起动效，均尊重 `MediaQuery.disableAnimations`；修复动爻行浅色底。
+- **flutter test 挂起修复**：`testWidgets` 运行于 FakeAsync，测试内 `await savePreferences(...)`（真实文件 IO）永不完成导致 `automatic casting auto-archives` 测试挂起直至文件级超时。修复：4 处 `savePreferences` 改 `tester.runAsync()` 包裹，`widget_test.dart` 注入 `preferencesDirectoryOverride` 临时目录 + `resetPreferencesCacheForTest()`。
+- **相关测试修复**：`_ResultExpansionCard` 移除把外部 key 透传给内部 `DSGlassPanel` 导致的重复匹配；导航栏「六爻」tab 加 `Key('nav-liuyao')`，测试改 key 点击避免与起卦页 header「六爻」模糊；两个用 `LiuyaoArchiveApp` 的测试预置 `calendarPolicySetupCompleted: true` 避免首次弹窗遮挡交互。
+- 回归：移动端 **80 项 Flutter 测试**（含此前挂起的 automatic 测试）8 秒全过、引擎 19 项 Dart 测试全过；`dart format` 通过。
+- 生成离线安装包 `六爻分析存档-界面优化-浅色仪器主题-v1.9.0.apk`（57.1MB，version 1.9.0+12），SHA-256 `e5bccb79...50084`；APK 离线门禁通过（无网络权限）。
+
+## 2026-08-20（第三批：五星排版 / 时刻起卦法重做 / 背景问念空白 / 档案 Tag / 子初子正）
+
+- **京房五星爻位排版**：`_FiveStarsLedger` 爻位排序改为上爻在上、初爻在下，与卦面爻线 reversed 方向一致；补方向断言测试。
+- **时刻起卦法按附件重做**：废弃原「年支/农历月日/时支 8、8、6」法，按《时刻起卦法详解(1)》重写引擎 `_computeTimePillar`：一时辰 120 分钟均分 12 刻（每刻十分钟，时辰内 0-9 分=子刻…）；五鼠遁推时柱天干、时上起子刻推刻柱天干；时支后天八卦为内卦（下）、刻支后天八卦为外卦（上）；动爻=（时干序+刻干序）mod 6、余 0 取上爻。黄金示例：2026-07-23 22:15 → 戊戌日癸亥时己未刻 → 地天泰四爻动 → 泰之大壮。`method_version` 更新为 `time_pillar.shichen_ke_houtian.v1`，UI 取数规则卡与确认文案同步更新。
+- **背景问念默认空白**：新建档案 `questionContext` 不再从 `question` 回填（saveCast、模型 fromJson、迁移 putIfAbsent 三处统一为空），保留旧档案已有内容，详情页仍可后续编辑。
+- **档案 Tag 系统**：`CaseSummary`/`CaseDetail` 新增 `tags` 字段（去空白/去重/忽略空项）；`ArchiveClient` 新增 `updateTags`，`listCases` 支持按标签筛选（包含全部已选）；详情页 `_QuestionCard` 展示标签 + 「标签」编辑弹窗（添加/删除/去重/20 字/30 个上限）；列表页新增标签筛选条（FilterChip，含清除筛选）与卡片标签展示，点击卡片标签直接进入筛选；旧档案迁移补空数组。
+- **子正子初重复修复**：万年历 13 时辰列表此前 index 0（子初）与 index 12（子正）共用同一日柱导致干支完全相同。现按 cnlunar twohour8CharList 语义：index 0-11 用当前时刻日柱、index 12（23 点子初）用次日日柱起子时；时柱独立按 dayBoundary 口径计算（`calculateHourGanzhi13`），不随展示列表变化；UI 标签修正为 index 0=子正、index 12=子初。
+- 回归：移动端 76 项 Flutter 测试（新增 9 项：Tag 管理、背景问念空白、标签筛选/迁移、子初子正等）、引擎 19 项 Dart 测试、Python 62 项（205 子测试）、Node 6 项全过；almanac parity 16115 快照、annotation/structure parity、离线源码门禁通过；dart format 通过。
+- 生成离线安装包 `六爻分析存档-时刻起卦重做与Tag系统-v1.8.0.apk`（54MB，version 1.8.0+11），SHA-256 `b94614a8...d8d6b2`；APK 离线门禁通过（无网络权限）。
+
 ## 2026-08-20（卦面交互接入真实页面 + 五行参照引擎支持）
 
 - 修复 v1.7.0 集成遗漏：此前卦面交互（十二长生参照联动、信息开关）只实现于未被引用的 `LiuyaoChartPreview`，真实起卦/档案流程使用的 `CaseDetailPage` 直接渲染裸 `LiuyaoCoreChart`，未传 `onGrowthTap`/`annotationMode`/`visibility`，故点击爻位标注无反应、无信息开关面板。
@@ -220,3 +313,158 @@
 - 新增本地数据设置说明，明确档案退出后台后仍保留、基础功能离线可用及卸载前导出边界；导出弹层按线框补齐两种格式和所含数据清单。
 - `dart analyze` 无问题，51 项 Flutter 测试全部通过；Android 模拟器完成万年历、档案和 04A 实机核对，截图归档于 `design/mobile-wireframes/review/v0.2/implementation/`。
 - 生成 `1.1.0+3` 新中式 UI 审阅 APK，SHA-256 为 `6457c929...587c793`；生产源码与 APK 断网门禁通过，模拟器明确 Activity 冷启动成功，覆盖安装后原档案仍保留。
+
+## 第七批 · 界面重做（v1.12.0）
+
+按「当代文人极简」设计文档执行**结构级界面重做**（非换色）：
+
+### 结构重做
+- **底部导航重做**：Material NavigationBar → 自绘 `DSBottomNavigation`（纸面浮起 + 发丝分隔线 + 青瓷短横线选中指示）
+- **分段控件重做**：Material SegmentedButton → 自绘 `DSSegmentedControl`（弱底槽 + 纸白选中块），起卦模式切换与标注模式切换全部接入
+- **背景重做**：删除仪器精密网格、四角刻度标尺、天盘弧线 → 安静宣纸 + 极淡顶部纸光
+
+### 卦面重排
+- 卦面头部：衬线卦名 24px w700、纸面卡片、`_MetaTag` 描边标签（替代深墨胶囊）
+- 卦表：白底 12px 圆角 + 表头底色块（surface）+ 内边距 16
+- 爻行：行高 8→11px、动爻左侧 2px 朱砂边条 + glowCinnabar 行底、六神 12px w600、纳甲干支 11→13px
+- 四柱面板：干支 14→16px w700（读数加大）
+- 神煞面板：深棕底+阴影 → 纸面 + 发丝边框 + 青瓷徽标（34px）
+- 十二长生账本：深棕 → 纸面；标注切换朱砂 → 自绘青瓷分段控件；参照 chips 朱砂 → 青瓷
+- 五星账本：金底 → 青瓷淡底
+- 保存按钮：朱砂 52px → 青瓷 44px
+
+### 色彩体系
+- bronze/amber → celadon（青瓷 #3D5A5B 主强调），47 处全库重命名
+- 五行色保持高饱和清晰可辨（吸取 v1.11.0 教训）
+- 字重全库收敛：w900→w700、w800→w600（7 文件 UI 层 + features 层全部）
+- 大圆角收敛：16/17/20/22 → 12
+- 硬编码深棕/金色/朱砂浅底 → 语义令牌
+
+### 验证
+- dart analyze：0 error（7 项既有 warning/info）
+- flutter test：83 项全过
+- 测试 key 全部保留（修复 1 处文案格式回归）
+- APK：`六爻分析存档-界面重做-当代文人极简-v1.12.0.apk`（56.8MB，1.12.0+16，SHA-256 前缀 cf26cbf48170fb5d，离线门禁通过）
+
+### 第七批补充 · 全页面重排（v1.12.0 二次构建）
+
+- 万年历页：页头 label 朱砂→淡墨、月份切换箭头/选中日格/详情竖条/RefreshIndicator 朱砂→玉青青瓷、日格圆角 14→10、财神方位卡暖棕底→纸面弱底+发丝边框
+- 档案页：页头 label 朱砂→淡墨；卦例卡片印章 64×72 大方章→44px 衬线小字章（朱砂字）、时间戳 w700→w400、卦变朱砂→青瓷深、卡片边距 12→14
+- 详情页：存档成功横幅硬编码绿→玉青 wash + w500
+- 终审计清零：w800/w900=0、大圆角≥16=0、深棕/金硬编码=0、features boxShadow=0、Material NavigationBar/SegmentedButton=0、仪器网格=0
+- APK 重打包：SHA-256 前缀 b92ce3624cc2881f，离线门禁通过（0 网络权限），83 项测试全过
+
+### 第八批补充 · 排盘结果页扁平化（v1.13.3，对照线框图二次压扁）
+
+- 首卡 CaseInfo 压成线框图两行结构：日期 11→10.5px、占问 13→12px、背景问念/标签 10→9px、内边距 (10,5,8,5)→(9,4,5,4)、行距 3→2；编辑按钮 24×24→20×20 行内化；删除 schema 版本调试行（仅保留在持久化数据中）
+- 卦面头部：删除与两列卦名重复的「本卦 → 变卦」流程行（showFlowSummary 链路整体移除）；_HexagramTitleBlock 三层（label/卦名/宫位）压为两层，label「本卦/变卦」并入卦名行做小字前缀
+- 测试同步：2 处流程行断言改为两列卦名分别可见（find.text('泽天夬')/('天风姤')），锁定新扁平布局
+- 验证：dart analyze 0 error；flutter test 85 项全过
+
+### 第九批补充 · 卦面可读性与爻位标注重构（v1.13.4）
+
+- 二十八宿爻位标注改单字显示（牛/虚/尾），省去「宿」后缀，Semantics 无障碍标签保留全称
+- 修复五星挤占十二长生：growthStagesOrEmpty 始终计算长生阶段；_buildAnnotationSegments 删除五星替换分支，长生与五星在爻位行并列独立显示，annotationMode 只控制面板参照
+- 卦爻信息开关重排：删除「显示卦爻信息」总开关与独立大卡；纳音/长生/五星/星宿四个统一规格小开关（24px 高、10px 字号、四等分单行）经 LiuyaoCoreChart footer 嵌入卦面卡片最底部，起卦页与详情页两处同步
+- 五行色加深提高白底对比：木 0xFF2F7D4F、火 0xFFC03A2E、土 0xFF8A6A45、金 0xFF96741B、水 0xFF2C6CB8（DSColorsV1 源头，全局生效）
+- 卦面字重提升：六亲 w400→w600 且主文本色、干支 w400→w700、六神 w600→w700、爻位标注加粗段 w600→w700（修复原三元两分支同值的 bug）、标注字号 7→7.5
+- 删除外部改动遗留的死代码 _ChartColumnHeader/_ColumnLabel
+- 验证：dart analyze 0 issue；flutter test 85 项全过（4 项开关/五星断言同步更新为并列显示行为）
+
+### 第十批补充 · 导出长图修复 + 标签分组 + 万年历（v1.13.5）
+
+- 导出长图 PNG 修复：_text 的 textAlign 此前对单行无效（TextPainter.paint 恒以左上角绘制），印章「卦/档案」、四柱、世应、表头全部左歪、变卦世应压住星宿——现在按 align 计算水平偏移真正居中/居右
+- 导出长图干支分色：爻行「六亲+干支」不再整词一色，改为六亲墨色 + 天干按干五行 + 地支按支五行（与 App 内同一契约）；四柱同步分色
+- 标签分组打通：档案页筛选行新增「＋ 标签」入口与标签管理弹窗（新建持久化到 AppPreferences.customTags、查看档案标签使用数、删除自定义标签）；AppPreferences 新增 customTags 字段（含 fromJson/toJson 兼容）；卦面详情「编辑标签」新增「快速选用」建议区（全部档案标签 + 自定义标签点选即加）
+- 万年历内嵌：卦面底部开关行扩展为「纳音/长生/五星/星宿/万年历」五列；点击「万年历」在开关行下方展开轻量月历（‹ ›翻月、周一为首列、今日描边、点选朱红高亮），起卦页与详情页两处接入，默认定位起卦月份
+- 新增 2 项锁定测试（万年历展开翻月；自定义标签创建→筛选行→详情页快速选用全链路）；修复 testWidgets FakeAsync 下偏好写盘需 runAsync 的挂起问题
+- 验证：dart analyze 0 issue；flutter test 87 项全过
+
+### 第十一批补充 · 万年历农历与日柱干支（v1.13.6）
+
+- 卦面内嵌万年历从纯公历网格升级为真万年历：每个日期格上行公历日、下行农历（初一显示月名含闰月标记如「闰六月」，节气日优先朱红显示节气名），格高 30→36
+- 选中日摘要条（网格下方，细分隔线 + 纸底小卡）：左列农历全称（中文年 + 闰月 + 月日 + 生肖），右列日柱干支按五行分色（天干用干色、地支用支色，与爻位同一契约）+ 纳音（纳音五行配色），附行显示节气与值宿（二十八宿全名）
+- 展开时默认选中起卦日，点选任意日期即切换摘要；引擎范围（1901-02-19 ~ 2100-02-08）之外显示支持范围提示
+- 数据源直接调用 liuyao_engine 同步纯函数（solarToLunar/calculateDayGanzhi/getNayin/getSolarTerm/calculateDailyMansion），零新增依赖、零网络
+- 测试更新：万年历测试断言农历副行、选中日摘要（日柱与农历由引擎同口径动态计算）、翻月点选后摘要切换
+- 验证：dart analyze 0 issue；flutter test 87 项全过
+
+### 第十二批补充 · 起卦台精简 + 品牌统一 + 包体优化（v1.13.7）
+
+- **删除起卦台模式重复说明**：手动/自动铜钱/时刻三页顶部的「六爻」朱红标签 + 模式大标题 + 副标题 + 「手动模式/时刻模式」墨色胶囊整块删除（与顶部分段控件重复）；页面直接从占问输入开始，方法卡（取数规则）保留
+- **手动起卦「日期」与「四柱来源」两卡合并**：合并为一张「起卦时间」卡——标题行右侧内嵌「自动计算/手动填写」紧凑切换；自动计算时显示日期 + 北京时间两栏，手动填写时只显示四柱编辑器（不再重复日期行），切换语义提示「手动填写覆盖自动计算，仅保存到本次档案」仅在手动态出现
+- **「道谕六爻」品牌字体统一**：新增 `DaoyuBrandTitle` 统一组件（headlineLarge/displayLight 家族 · w600 · letterSpacing -1 · 主题墨色，以档案案例库页为唯一基准）并加入 design_system barrel；六爻页（displayLight 26/w300）、设置页（serif 衬线）、卦面详情 AppBar（默认 title）四处全部替换，组件注释禁止再手写样式漂移
+- **测试修复（既有时间炸弹）**：`almanac selected date flows into casting page` 硬编码 2026-08-09 因系统日期跨入 9 月（日历默认跟随今天）找不到格子——改为动态当月日期；时刻起卦断言「一时辰十二刻」原文只在确认弹窗，初始可见为方法卡表述——断言改为「均分 12 刻」
+- **APK 体积与架构优化**：构建方式由 debug fat 包（150MB，含三架构 + JIT + 调试符号）改为 `flutter build apk --release --split-per-abi`——arm64-v8a 20.2MB / armeabi-v7a 17.9MB / x86_64 21.7MB，MaterialIcons 字体 tree-shaking 99.4%（1.6MB→10KB）；release 沿用 debug 签名可直接安装；工作区根目录 21 个历史 APK（1.8GB）归档至 `apk-archive/` 子目录
+- 验证：dart analyze 0 issue；flutter test 87 项全过；交付 `道谕六爻-起卦精简与统一品牌-v1.13.7-arm64-release.apk`（19MB，SHA-256 前缀 f8866f3954f93fa4）
+
+### 第十三批补充 · 时刻起卦法 2.0（v1.14.0）
+
+- **规则变更动机**：1.0 内卦取时支后天八卦，而人类活动集中在 7-23 点，导致内卦为巽/坤/乾的概率过大、卦象分布偏斜。2.0（用户 2026-09-01 确认）改为刻干纳甲定内卦，刻干在时辰内逐刻轮转，分布显著均匀化（7-23 点扫描：坎100/离100/震100/巽100/艮90/兑90，乾坤 190 系纳甲两干所致）。
+- **引擎层**（`liuyao_engine/src/cast_engine.dart` `_computeTimePillar`）：
+  - 内卦：刻柱天干按六爻纳甲翻卦（甲壬乾、乙癸坤、丙艮、丁兑、戊坎、己离、庚震、辛巽）；外卦：保持刻支后天方位翻卦（子坎、丑寅艮、卯震、辰巳巽、午离、未申坤、酉兑、戌亥乾）；
+  - 动爻：由（时干序+刻干序）改为（**日干序+时干序**）mod 6，余 0 取上爻；
+  - 刻制不变：一时辰 120 分钟均分 12 刻、每刻十分钟，时上起刻法（五鼠遁）推刻干；
+  - `raw_input` 新增 `day_stem_ordinal` / `ke_stem_ordinal` / `inner_trigram_source` / `outer_trigram_source`；`method_version` 升 `time_pillar.ke_gan_najia.v2`，trace rule_id 升 v2、步骤文案按 2.0 三步流程重写。
+- **App 层**（`time_pillar_casting_page.dart`）：取数规则方法卡与确认弹窗文案同步 2.0（刻干纳甲内卦表、刻支方位外卦表、日干+时干动爻、念头锁时表述）；页面 doc 注释更新并记录 1.0→2.0 变更缘由。
+- **测试**：引擎黄金示例更新——2026-07-23 22:15（戊戌日癸亥时己未刻）由「地天泰四爻动」改为「地火明夷三爻动（明夷之复）」；新增「同一时辰内换刻换内卦」用例锁定 2.0 核心差异（壬午刻内卦乾 → 癸未刻内卦坤）；余 0 取上爻用例改用庚戌日戊寅时（7+5=12）。引擎 22 项全过；Flutter 87 项全过（方法卡断言同步）。
+- 验证：dart analyze 双侧零 error（仅既有 info）；交付 `道谕六爻-时刻起卦2.0-v1.14.0-arm64-release.apk`
+
+### 第十四批补充 · 四土十二长生显示修复 + 卦属性去重（v1.14.1）
+
+- **四土规则排查结论**：引擎 `_earthSourcePhases`（丑辰未戌四土独立表）与用户提供的《五行大義》规则逐条一致（坤为地卦例探针验证：未土在卯=长生、丑土在卯=死 ✓）；问题出在显示层两处。
+- **引擎修复**（`private_reference.dart`）：`_growthAliases` 补 `受气→绝`——四土表的「受气」即标准「绝」位（跨主体+4/+5 两支），此前 display 层无此别名导致按标准段名匹配时土爻「绝」永远缺失；「衰病」为《五行大義》原文合并段，无单一标准段名，保留原样。source_phases 保留全部原文可追溯。
+- **UI 修复**（`case_detail_page.dart` `_twelveStageSummary` 重写）：旧逻辑取首爻日柱参照的**单条** stage 匹配四段名，最多输出一段、土爻段名匹配不上时退化为「五行体系 · N 爻」；新逻辑以**日支为主体**遍历十二支查 长生/帝旺/墓/绝 四段所在支——日支为辰戌丑未自动走四土独立表，受气跨两支时按原文先列主体+4 支（如未土「受气于亥子」显示 绝-亥）。对齐线框图「十二：长生-寅 帝旺-午 墓-戌 绝-亥」四段格式。
+- **卦属性去重**（`chart_preview.dart`）：①起卦页 `_ChartHeader` 删除宫位信息行的「 · 六冲」后缀（属性只在 MetaTag 行显示一遍），MetaTag 行补游魂卦/归魂卦标签（京房宫序 7/8）；②详情页 `_HexagramComparisonHeader` 修复拼接 bug——旧 `[hexagramProperty,'六冲'].join` 在六冲卦输出「六冲 · 六冲」，改为 `_propertyLabel` 统一合并（六冲/六合 + 游魂/归魂，各来源只取一次）。
+- **测试**：引擎补 受气→绝 / 衰病保留 display 断言（6 项）；Flutter 详情页测试补卦属性 findsNothing 防回归断言（4 项）。
+- 验证：dart analyze 零 error；引擎 22 项 + Flutter 全量测试通过；交付 `道谕六爻-四土长生与属性去重-v1.14.1-arm64-release.apk`
+
+### 第十五批补充 · 导出长图重排版 + 档案删除 + 问念可空（v1.15.0）
+
+- **导出长图重排版**（`archive_image_export.dart`）：
+  - 删除左上角卦名——头部原本两行（档案标题 + 「泽天夬 → 泽天夬之履」卦名行）与下方卦面卡大字卦名重复；现卦名行删除，且档案标题默认取本卦名时头部不再显示（仅用户自定义过标题才出现），头部只留「卦·档案」印章；
+  - 全局字号放大约 25-30% 并重排列位：占问 34→40、四柱 36→44、本卦名 43→54、爻行六亲干支 28→36、纳音/长生/宿次行 19→24、解读正文 29→34、区块标题 36→44、爻线宽 13→15；行高 126→140，六列（六神/伏神/本卦/爻·世应/变卦/爻）按新字号重排 x/宽；
+  - 版式常量提炼为 `_headerHeight` / `_infoCardHeight` / `_chartPillarZone` / `_chartHeaderZone` / `_lineRowHeight`，measure()/paint() 联动防漂移；
+  - 顺带修复：起卦方式标签由 manual ? 手动 : 自动铜钱 的三元式改为三值 switch——`time_pillar` 此前在导出图与详情页头部被错标为「自动铜钱」，现正确显示「时刻起卦」（详情页 `case_detail_page.dart` 同步修）；
+  - 视觉验证：临时测试渲染 1080×2275 样张人工核对（头部/四柱/卦名/爻表/世应/动爻标记/解读/页脚对齐无误）后删除临时文件。
+- **档案删除（二次确认）**：
+  - 数据层（`archive_client.dart`）：`ArchiveDataSource` 新增 `deleteCase(id)`；`ArchiveClient` 实现为内存移除 + `_persist` 原子落盘，案例不存在时显式抛错不静默成功；
+  - UI 两个入口：详情页 AppBar 新增删除按钮（`case-delete`）、档案列表卡片长按（`onLongPress`）；均弹 AlertDialog 二次确认——标题「删除这份档案？」、正文明示「卦面、解读与反馈将被永久删除，且无法恢复」、按钮「再想想 / 删除」（朱砂色），确认后删除并返回/刷新列表，SnackBar 回执；
+  - 测试：详情页先取消后确认两段式验证 + 列表长按确认删除（3 项 widget 测试）；持久化测试新增「删除后立即落盘、模拟重启后不复活、重复删除显式报错」。
+- **起卦问念可空**（三个起卦页）：移除「请先填写占问事项」必填校验，留空提交时统一记为「暂无问念」入档与显示；1000 字上限保留；输入框提示改为「可不填，留空记为「暂无问念」；写清楚对象与背景更好」。
+- 验证：dart analyze 零 error（仅 2 条既有 info）；Flutter 全量 91 项测试通过（新增 4 项）；交付 `道谕六爻-长图删除与问念可空-v1.15.0-arm64-release.apk`
+
+### 第十六批补充 · 十二长生五行参照语义修正 + 参照 chips 两排（v1.15.1）
+
+- **问题定位**（用户 2026-09-01 反馈「五行木火土金水切换不对」）：探针实测发现 UI 传参链完整（切换时卦面确实在变），真正的 bug 在**引擎 `element:X` 参照的语义做反了**——旧实现以「爻支为主体、固定观察该五行的长生起点支」，结果只随爻支自身五行变化：`element:火` 与 `element:土` 输出完全相同（火土同宫同起点寅）、土爻恒显帝旺（观察支取自身）。
+- **引擎修复**（`private_reference.dart` + `rules.dart`）：新增 `lookupElementGrowth(element, observedBranch)`——主体=所选五行、观察支=爻支，直接查 `twelveStagesTable`（木火金水标准表；土用引擎通用土表，长生在申、水土同宫口径）；`buildFiveElementTwelveStages` 的五行参照段改用它，trace steps 文案同步为「五行 X 主体观察爻支」。四柱参照不受影响。
+- **旧档案兼容**：档案十二长生为存档时冻结快照，旧档案仍是反向语义数据——展示层统一校正：`_ChartTable.growthStages` 与账本 `_TwelveStagesRow` 在 `element:` 参照下不再读快照 stage，改用引擎新表按该爻地支现算（观察支显示爻支），新旧档案显示一致。
+- **排版**（用户需求 3）：折叠卡参照 chips 由单个 Wrap 改为**两排**——四柱（年月日时）一排、五行（木火土金水）一排，等宽居中；点击卦面小字弹出的参照弹窗同步补齐五行主体选项并分组（四柱参照 / 五行主体 / 京房五星）。
+- **口径说明**：水与土参照结果相同属正常——两者长生流程一致（水土同宫、长生在申，六爻通行口径）；木/火/金各异。
+- **测试**：引擎新增「五行主体参照」锁定测试（山天大畜逐爻验证：初爻子 木沐浴/火胎/水帝旺、二爻寅 木临官/火长生/金绝、四爻戌 火墓/金衰/木养）；App 新增 `twelve_stages_element_test.dart` 两项（五行参照驱动卦面小字 + 两排 chips 存在且联动）。引擎 23 项、Flutter 95 项全过。
+- 验证：dart analyze 零 error；交付 `道谕六爻-五行参照修正-v1.15.1-arm64-release.apk`
+
+### 第十七批补充 · 导出长图标注补全 + 左上角印章移除（v1.15.2）
+
+- **问题定位**（用户 2026-09-01 反馈「十二长生那些信息被省略、左上角那个东西要删」）：渲染样张核对发现两处——①爻行小字只有一行且列宽 164px / 24 号字只容 6 字左右，「纳音·长生·宿」被 ellipsis 截断（如「钗钏金·…」），且**缺京房五星**（App 卦面是纳音/长生/五星/宿四段并列）；②左上角还剩「卦·档案」朱砂印章（上批删卦名时保留的元素）。
+- **爻位标注补全**（`archive_image_export.dart`）：`_layerSecondary` 单行字符串重构为 `_layerAnnotationLines` 两行分段标注——行1「纳音·十二长生」、行2「五星·宿」，与 App 卦面同规格；新增 `_segmentsText` 多段着色绘制（纳音按纳音五行着色、五星按五星五行着色、长生/宿墨色加粗、段间「·」分隔），**整行超宽时等比缩放（等价 FittedBox.scaleDown）不做省略号截断**；五星短名沿用 App 口径（镇土→镇、岁木→岁、太白/太阴/荧惑原样）；宿名去掉「宿」字与 App 一致（2026-08 需求顺带修正）。
+- **左上角印章移除**：`_paintHeader` 删除「卦·档案」印章绘制；头部仅在用户自定义标题（≠本卦名）时保留一行 56 号标题（`_headerHeight` 120→84），默认标题档案头部零占位（measure/paint 条件联动）。
+- **测试**：widget_test 新增「默认标题头部零占位」回归测试——同内容两份档案（自定义标题 vs 默认卦名标题）各导出 PNG，解析 IHDR 高度断言差值恰为 112px（84 头部 + 28 间距）。
+- 验证：dart analyze 零 error；引擎 23 项、Flutter 94 项测试全过；样张人工核对（海中金·长生 / 太白·角 等逐爻标注完整无截断）；交付 `道谕六爻-导出补全与印章移除-v1.15.2-arm64-release.apk`
+
+### 第十八批补充 · 档案卡片滑动删除（v1.15.3）
+
+- **滑动删除入口**（用户 2026-09-01 需求，挂历式）：档案列表卡片包 `Dismissible`——左右滑均可呼出（`DismissDirection.horizontal`），朱砂底「删除」背景（圆角随卡片）；滑动超过阈值即弹**二次确认框**（与长按入口共用同一个 `_confirmDeleteDialog`：「删除这份档案？」/再想想/删除），取消则卡片弹回原位。
+- **确认后链路**：`onDismissed` 先同步 `setState` 把卡片移出列表（避免被滑走的 widget 残留树中），再调 `_deleteCase` 落库删除并刷新；删除失败时回拉列表恢复卡片并 SnackBar 报错。长按入口重构为共用同一删除管道（`_confirmDelete` → `_deleteCase`），行为不变。
+- **resizeDuration: null**：跳过 Dismissible 默认收拢动画——实测保留默认 resize 时，动画完成后 keep-alive 的 element 在列表刷新时会被再 build 一次，命中「A dismissed Dismissible widget is still part of the tree」断言（真机列表刷新同样可能触发）；卡片此时已整体滑出屏，收拢效果由同步移除承接，视觉无差异。
+- **测试**：fake 档案源 `deleteCase` 语义补全（删除后 `listCases` 返回空，此前只计数不生效，滑动测试暴露后修正）；新增「swipe-to-delete」测试：右滑→取消卡片弹回且未删除 → 再滑→确认后列表移除、落库 deletedId 正确、SnackBar 回执。
+- 验证：dart analyze 零 error；Flutter 全量 95 项测试通过；交付 `道谕六爻-滑动删除档案-v1.15.3-arm64-release.apk`
+
+### 第十九批补充 · 全局字体规范统一 + 导出道谕宋 + Taoracle 入口（v1.16.0）
+
+- **导出长图换「道谕宋」细瘦字体**（用户 2026-09-01 需求「字够大了，换瘦一点的细宋」）：本机 OFL 开源「京華老宋体 KingHwa OldSong」经 fontTools 子集化（GB2312 全集 + 数字标点，6.2MB）打包为 `assets/fonts/DaoyuSong-Regular.ttf`（附 OFL 授权文件），pubspec 注册 family `DaoyuSong`；`archive_image_export.dart` 三处字体链替换（保留系统 sans 兜底子集外生僻字），全字重统一 w400——单字重铅字轮廓，合成加粗会糊，层级改由字号与五行色承担。样张人工核对：大字清晰细瘦达标。
+- **全局字体规范统一**（用户需求「系统字体不够统一，以道谕六爻为准」）：三处不统源清理——①主题级 `serif()` 转换（display/headline/title 全套切衬线链）改为 `heading()`：保留 w600→w700 层级提升、不再切衬线链（**Android 无衬线可回退，此前双端与页面间标题字体漂移**）；②`DSTypography.mono` 六处单汉字使用（四柱干支 chip、天干地支爻位列）收敛为 `body`——等宽链无中文字形，中文回退默认体造成基线漂移；③两处印章字（档案列表「卦」、详情印章组件）由手写 `Songti SC` 链改为打包 `DaoyuSong`，双端渲染一致。`DSTypography.serif` 构造加禁用注释，仅保留极端衬线场景。
+- **设置页入口调整**（用户需求「设计系统预览不留，换作者其他产品」）：删除「设计系统预览」入口与 `design_system_preview_page.dart` 页面文件（含空 demo 目录，安装包不再含开发者调试页）；新增「道谕Taoracle」入口卡片（副标「作者其他产品」+ 外链图标），`url_launcher` `launchUrl(externalApplication)` 跳转 https://taoracle.com，无浏览器环境静默降级。
+- **SDK 兼容修复**：Flutter 3.44 的 `AppBarTheme` 已移除 `systemUiOverlayStyle` 参数（既有代码编译 error）——该行状态栏深色图标本就由 `app.dart` 全局 `AnnotatedRegion<SystemUiOverlayStyle.dark>` 保障，直接删除冗余行，行为零变化。
+- **测试基建**：导出样张插桩落盘必须整体包进 `tester.runAsync`（FakeAsync 不调度真实文件 IO，裸 `await File.writeAsBytes` 会挂死——上一轮会话中断的直接原因）；修复后三次连跑 byte 级一致，DEBUG dump 全量文本证明导出无纳音重复出口（此前疑似旧版残留样张误判）。
+- **测试**：导航测试追加断言（旧预览入口 findsNothing、Taoracle 入口存在需 scrollUntilVisible）；dart analyze lib 零问题；Flutter 全量 95 项测试通过；交付 `道谕六爻-字体统一与Taoracle-v1.16.0-arm64-release.apk`
