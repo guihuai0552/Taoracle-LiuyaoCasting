@@ -5,9 +5,9 @@
 [![Offline](https://img.shields.io/badge/%E8%BF%90%E8%A1%8C-%E5%AE%8C%E5%85%A8%E7%A6%BB%E7%BA%BF-2EA44F)](https://github.com/guihuai0552/Taoracle-LiuyaoCasting)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-完全离线的 Android 六爻排盘与案例存档工具。基于**京房八宫纳甲体系**装卦，排盘结果完整可追溯，档案本地保存、可导出、可迁移——不依赖任何网络服务、账号或模型 API。
+完全离线的六爻排盘与案例存档工具。基于**京房八宫纳甲体系**装卦，排盘结果完整可追溯，档案本地保存、可导出、可迁移——不依赖任何网络服务、账号或模型 API。
 
-## ✨ 功能特性
+##  功能特性
 
 - **万年历** —— 1901–2100 年农历、精确交节四柱（立春换年、十二节换月，精确到秒）、纳音、旬空、13 时辰、值日二十八宿、二十四节气与财神方位。
 - **起卦** —— 手动逐爻录入与三枚铜钱自动摇卦，爻序固定为初爻至上爻。
@@ -18,7 +18,7 @@
 
 排盘遵循的规则体系、底本出处与治理原则见 **[RULES.md](RULES.md)**。
 
-## 🏗️ 架构
+##  架构
 
 ```text
 packages/liuyao_engine/   纯 Dart 排盘与万年历引擎（生产唯一算法源，无 Flutter/网络依赖）
@@ -30,7 +30,7 @@ docs/                     产品、规则、规格与决策文档中心
 
 引擎当前输出 **schema v16**：本卦/变卦各自卦宫世应、纳甲、逐爻纳音、六亲、六神、用户确认口径的完整伏卦/伏神、本伏变三层十二长生与京房二十八宿、五项神煞、卦身/命爻、私有参考合同及完整计算轨迹。
 
-## 🚀 快速开始
+##  快速开始
 
 ### 前置要求
 
@@ -62,7 +62,7 @@ python3 scripts/check_offline_mobile_release.py \
   --apk apps/mobile/build/app/outputs/flutter-apk/app-release.apk
 ```
 
-## ✅ 测试与验证
+##  测试与验证
 
 ```bash
 # 引擎单元测试
@@ -79,7 +79,7 @@ services/liuyao-engine/.venv/bin/python scripts/check_offline_liuyao_annotation_
 
 验证矩阵覆盖：64 卦完整卦盘、60 纳音、144 项十二长生、固定动爻合同，以及 2,388 个精确交节「前一秒 / 当秒」边界。
 
-## 📐 目录结构
+##  目录结构
 
 ```text
 packages/liuyao_engine/      # 排盘引擎（算法唯一源）
@@ -97,20 +97,20 @@ docs/
   └─ decisions/              # ADR 与决策日志
 ```
 
-## 📚 文档
+##  文档
 
 - **[RULES.md](RULES.md)** —— 排盘规则遵循说明（先读这个）
 - [文档中心](docs/README.md) —— 单一事实源入口
 - [规则来源登记表](docs/rules/source-register.md) —— 每条规则的出处、等级与采用状态
 - [项目术语表](docs/rules/glossary.md) —— 排盘、本伏、值日宿等核心名词
 
-## 🤝 贡献
+##  贡献
 
 - 提交信息使用 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)，例如 `feat: add archive detail page`。
 - 所有排盘规则改动先进入 `packages/liuyao_engine`，通过 Python↔Dart 对照后再动 UI；Widget 不得自算业务规则。
 - 规则争议先读 [docs/README.md](docs/README.md) 的治理流程，并同步 [规则来源登记表](docs/rules/source-register.md)。
 
-## 📄 许可证
+##  许可证
 
 [MIT](LICENSE)。引擎中 cnlunar 移植部分的第三方许可声明见 [THIRD_PARTY_NOTICES.md](packages/liuyao_engine/THIRD_PARTY_NOTICES.md)。
 
