@@ -118,7 +118,6 @@ docs/
 |---|---|---|
 | [OPN48/cnlunar](https://github.com/OPN48/cnlunar) | MIT | **万年历核心**——农历、二十四节气、四柱、纳音、财神方位等历法算法的移植基线；生产端为纯 Dart 精确移植，运行时不依赖 Python |
 | [6tail/lunar-python](https://github.com/6tail/lunar-python) | MIT | 1901–2099 年精确交节时间的对照来源，用于跨实现核验 |
-| [kentang2017/najia](https://github.com/kentang2017/najia) | MIT | 纳甲装卦规则的 Python 对照实现，仅用于回归测试，不随产品分发 |
 | [ButCornB/KingHwa-OldSongfont](https://github.com/ButCornB/KingHwa-OldSongfont) | OFL-1.1 | 「京华老宋体」——App 卦面导出排版字体（GB2312 子集） |
 
 感谢以上项目的作者与维护者。

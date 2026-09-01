@@ -31,14 +31,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Najia
+## Najia（开发对照工具）
 
-- 来源：https://github.com/kentang2017/najia
-- 对照版本：tag `v2.0.1`，commit `c67a539...`
+- 来源：https://github.com/bopo/najia
+- 对照版本：tag `v2.0.1`，commit `c67a5398632a80f368a17a884c1c71b203aab719`
 - 许可证：MIT
+- 依赖位置：Python 对照服务 `services/liuyao-engine` 的开发依赖（PyPI `najia==2.0.1`）
 
-本包未在运行时依赖 Python Najia；其固定输出用于基础纳甲规则的对照和回归测试。正式独立
-发布前，应将 Najia 上游完整 MIT 声明与精确完整 commit 一并纳入发布清单。
+本项目排盘规则遵循京房八宫纳甲体系（见 [RULES.md](../../RULES.md)），不采用 Najia
+的自有规则。它仅在开发期作为 Python 对照实现参与排盘行为的回归测试；Dart 引擎与
+App 不包含其代码，也不随产品分发。
 
 ## 6tail/lunar-python
 
