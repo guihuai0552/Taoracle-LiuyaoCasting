@@ -34,6 +34,11 @@ void main() {
   setUp(() {
     preferencesDirectoryOverride = () async => _prefsTempDir;
     resetPreferencesCacheForTest();
+    // 2026-09-04：导出首启「历史版本默认值」选择默认视为已完成，
+    // 避免既有导出测试被一次性弹窗拦截；首启行为由专项测试覆盖
+    // （自行改写该偏好）。savePreferences 首行同步更新内存缓存，
+    // 不 await 也不会阻塞 FakeAsync 测试环境。
+    savePreferences(const AppPreferences(exportSetupCompleted: true));
   });
 
   tearDownAll(() async {
@@ -1389,7 +1394,9 @@ void main() {
       expect(find.byKey(const Key('export-markdown')), findsOneWidget);
       expect(find.byKey(const Key('export-json')), findsOneWidget);
       expect(find.byKey(const Key('export-image')), findsOneWidget);
-      await tester.tap(find.byType(ModalBarrier).last);
+      // 2026-09-04 面板增加两个内容开关后整体变高，屏幕中心落在面板
+      // 内容上；直接点面板上方的 barrier 区域关闭。
+      await tester.tapAt(const Offset(215, 60));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('case-detail-scroll')), findsOneWidget);
 
@@ -1783,6 +1790,82 @@ void main() {
     expect(customHeight - defaultHeight, 112);
   });
 
+  testWidgets('archive image export honors content trimming options', (
+    tester,
+  ) async {
+    // 2026-09-04 需求：导出可裁剪——关闭解读/反馈后整个区块不绘制，
+    // 仅保留最新解读版本时高度介于两者之间。以 IHDR 高度差锁定
+    // measure()/paint() 的裁剪联动。
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: SizedBox(key: Key('anchor'))),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final archive = _FakeArchiveDataSource.withCase();
+    const longBody =
+        '这是用于撑起多行排版的解读正文，'
+        '内容足够长才能在两个裁剪档位之间产生可观测的高度差。';
+    await archive.appendUserAnalysis(
+      caseId: archive.detail.id,
+      body: longBody * 4,
+      expectedRevision: 0,
+    );
+    await archive.appendUserAnalysis(
+      caseId: archive.detail.id,
+      body: longBody * 4,
+      expectedRevision: 1,
+    );
+    await archive.appendFeedback(
+      caseId: archive.detail.id,
+      body: '应验的反馈内容',
+      status: 'matched',
+    );
+    final context = tester.element(find.byKey(const Key('anchor')));
+
+    int pngHeight(dynamic bytes) {
+      expect(bytes.take(8).toList(), [137, 80, 78, 71, 13, 10, 26, 10]);
+      // PNG：8 字节签名 + IHDR(4 长度 + 4 类型) + 宽 4 字节 + 高 4 字节 big-endian。
+      return (bytes[20] << 24) |
+          (bytes[21] << 16) |
+          (bytes[22] << 8) |
+          bytes[23];
+    }
+
+    final full = await tester.runAsync(
+      () => buildCaseArchivePng(context, archive.detail),
+    );
+    final bare = await tester.runAsync(
+      () => buildCaseArchivePng(
+        context,
+        archive.detail,
+        options: const ArchiveImageOptions(
+          includeAnalysis: false,
+          includeFeedback: false,
+        ),
+      ),
+    );
+    final latestOnly = await tester.runAsync(
+      () => buildCaseArchivePng(
+        context,
+        archive.detail,
+        options: const ArchiveImageOptions(includeAnalysisHistory: false),
+      ),
+    );
+    expect(full, isNotNull);
+    expect(bare, isNotNull);
+    expect(latestOnly, isNotNull);
+    final fullHeight = pngHeight(full!);
+    final bareHeight = pngHeight(bare!);
+    final latestHeight = pngHeight(latestOnly!);
+    // 全裁剪：解读区（区块壳 34+64 + 卡片头 34 + 两版多行正文）与
+    // 反馈区整体消失，收缩量远超区块壳本身。
+    expect(fullHeight - bareHeight, greaterThan(500));
+    // 仅最新版：比全量矮（少一版解读），比全裁剪高（仍含一版解读+反馈）。
+    expect(fullHeight - latestHeight, greaterThan(0));
+    expect(latestHeight - bareHeight, greaterThan(0));
+  });
+
   testWidgets('almanac calendar expands below annotation toggles', (
     tester,
   ) async {
@@ -1906,6 +1989,160 @@ void main() {
       expect(find.byKey(const Key('tag-chip-占工作')), findsOneWidget);
     },
   );
+
+  testWidgets('2026-09-04 detail page edits the question text itself', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(home: ArchivePage(dataSource: archive)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('archive-case-case-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('工作是否顺利推进？'), findsWidgets);
+    await tester.tap(find.byKey(const Key('edit-question')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('question-editor')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('question-editor')),
+      '换一份工作是否更顺利？',
+    );
+    await tester.tap(find.byKey(const Key('save-question')));
+    await tester.pumpAndSettle();
+    // 弹层关闭、详情刷新、SnackBar 回执。
+    expect(find.byKey(const Key('question-editor')), findsNothing);
+    expect(archive.detail.question, '换一份工作是否更顺利？');
+    expect(find.text('占问已保存'), findsOneWidget);
+    expect(find.textContaining('换一份工作是否更顺利？'), findsWidgets);
+    // 背景问念编辑入口仍保留（两个功能并存）。
+    expect(find.byKey(const Key('edit-question-context')), findsOneWidget);
+  });
+
+  testWidgets('2026-09-04 analysis history version can be deleted', (
+    tester,
+  ) async {
+    // 加高视口：解读卡展开后历史列表仍在屏内，避免 tap 落到视口外。
+    await tester.binding.setSurfaceSize(const Size(430, 1900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final archive = _FakeArchiveDataSource.withCase();
+    await archive.appendUserAnalysis(
+      caseId: archive.detail.id,
+      body: '第一版解读内容',
+      expectedRevision: 0,
+    );
+    await archive.appendUserAnalysis(
+      caseId: archive.detail.id,
+      body: '第二版解读内容',
+      expectedRevision: 1,
+    );
+    final detail = await archive.getCase(archive.detail.id);
+    expect(detail.analyses.length, 2);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollable = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const Key('case-detail-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('result-analysis-section')),
+    );
+    await tester.tap(find.byKey(const Key('result-analysis-section')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('analysis-history')));
+    await tester.tap(find.byKey(const Key('analysis-history')));
+    await tester.pumpAndSettle();
+    expect(find.text('2 个版本'), findsOneWidget);
+
+    // 删除版本 2：先确认框，再真正删除。
+    await tester.ensureVisible(find.byKey(const Key('delete-analysis-2')));
+    await tester.tap(find.byKey(const Key('delete-analysis-2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('delete-analysis-confirm')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('delete-analysis-confirm')));
+    await tester.pumpAndSettle();
+    expect(archive.detail.analyses.single.body, '第一版解读内容');
+    expect(archive.detail.analyses.single.revision, 1);
+    // 删除的是最高版本（2）：水位不回退（真实语义由数据层测试锁定）。
+    expect(archive.detail.latestAnalysisRevision, 2);
+    expect(find.text('1 个版本'), findsOneWidget);
+
+    // 取消路径：删除版本 1 前先点「再想想」，版本保留。
+    await tester.ensureVisible(find.byKey(const Key('delete-analysis-1')));
+    await tester.tap(find.byKey(const Key('delete-analysis-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('delete-analysis-cancel')));
+    await tester.pumpAndSettle();
+    expect(archive.detail.analyses.single.body, '第一版解读内容');
+  });
+
+  testWidgets('2026-09-04 export prompts history default once, then toggles', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // setUp 默认视为已完成；本测试专门验证首启路径，改回未完成。
+    savePreferences(
+      currentPreferences.copyWith(
+        exportSetupCompleted: false,
+        exportAnalysisHistoryDefault: true,
+      ),
+    );
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(home: ArchivePage(dataSource: archive)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('archive-case-case-1')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('case-export')));
+    await tester.pumpAndSettle();
+    // 首启：先问「导出解读时默认包含历史版本吗？」
+    expect(find.byKey(const Key('export-setup-dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('export-setup-latest')));
+    await tester.pumpAndSettle();
+    // 选择被记住：历史版本开关初始为关。
+    expect(currentPreferences.exportSetupCompleted, true);
+    expect(currentPreferences.exportAnalysisHistoryDefault, false);
+    expect(find.byKey(const Key('export-sheet')), findsOneWidget);
+    Switch historySwitch() => tester.widget<Switch>(
+      find
+          .descendant(
+            of: find.byKey(const Key('export-include-history')),
+            matching: find.byType(Switch),
+          )
+          .first,
+    );
+    expect(historySwitch().value, isFalse);
+    // 内容开关：关掉「包含解读与反馈」后历史版本开关禁用，描述同步。
+    await tester.tap(find.byKey(const Key('export-include-records')));
+    await tester.pumpAndSettle();
+    expect(historySwitch().onChanged, isNull);
+    expect(find.text('仅卦面与占问，适合只分享卦本身'), findsOneWidget);
+    // 再次导出不再弹首启选择。导出面板较高，屏幕中心在面板内容上，
+    // 直接点面板上方的 barrier 区域关闭。
+    await tester.tapAt(const Offset(215, 60));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('case-export')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('export-setup-dialog')), findsNothing);
+    expect(find.byKey(const Key('export-sheet')), findsOneWidget);
+  });
 }
 
 class _FakeAlmanacDataSource implements AlmanacDataSource {
@@ -2180,6 +2417,19 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
   final List<Map<String, dynamic>> _analyses = [];
   final List<Map<String, dynamic>> _feedbacks = [];
 
+  /// 与真实 ArchiveClient 一致：`latestAnalysisRevision` 是只升不降的
+  /// 水位——删除版本不回退，新版本 revision 取水位 +1（不复用空洞）。
+  int _revisionCeiling = 0;
+
+  int get _knownRevisionCeiling {
+    final currentMax = _analyses.isEmpty
+        ? 0
+        : _analyses
+              .map((item) => item['revision'] as int)
+              .reduce((a, b) => a > b ? a : b);
+    return currentMax > _revisionCeiling ? currentMax : _revisionCeiling;
+  }
+
   static CaseDetail _detailFrom({String question = '此事后续如何？'}) {
     final now = DateTime(2026, 8, 5, 15, 26);
     return CaseDetail.fromJson({
@@ -2224,18 +2474,19 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
 
   void _rebuild({
     Map<String, dynamic>? chart,
+    String? question,
     String? questionContext,
     List<String>? tags,
   }) {
     final json = <String, dynamic>{
       'id': detail.id,
       'title': detail.title,
-      'question': detail.question,
+      'question': question ?? detail.question,
       'castAt': detail.castAt.toIso8601String(),
       'castingMethod': detail.castingMethod,
       'baseHexagram': detail.baseHexagram,
       'changedHexagram': detail.changedHexagram,
-      'latestAnalysisRevision': _analyses.length,
+      'latestAnalysisRevision': _knownRevisionCeiling,
       'createdAt': detail.createdAt.toIso8601String(),
       'updatedAt': DateTime(2026, 8, 6).toIso8601String(),
       'questionContext': questionContext ?? detail.questionContext,
@@ -2323,6 +2574,15 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
   }
 
   @override
+  Future<void> updateQuestion({
+    required String caseId,
+    required String question,
+  }) async {
+    final normalized = question.trim();
+    _rebuild(question: normalized.isEmpty ? '暂无问念' : normalized);
+  }
+
+  @override
   Future<void> updateQuestionContext({
     required String caseId,
     required String context,
@@ -2331,16 +2591,29 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
   }
 
   @override
+  Future<void> deleteAnalysis({
+    required String caseId,
+    required String analysisId,
+  }) async {
+    _analyses.removeWhere((item) => item['id'] == analysisId);
+    _rebuild();
+  }
+
+  @override
   Future<void> appendUserAnalysis({
     required String caseId,
     required String body,
     required int expectedRevision,
   }) async {
+    // 与真实 ArchiveClient 一致：revision 取 latestAnalysisRevision +1
+    //（水位不因删除回退，不复用删除留下的空洞）。
+    final nextRevision = _knownRevisionCeiling + 1;
+    _revisionCeiling = nextRevision;
     _analyses.add({
-      'id': 'analysis-${_analyses.length + 1}',
+      'id': 'analysis-$caseId-$nextRevision',
       'author': 'user',
       'body': body,
-      'revision': _analyses.length + 1,
+      'revision': nextRevision,
       'createdAt': DateTime(2026, 8, 6).toIso8601String(),
     });
     _rebuild();
@@ -2386,6 +2659,9 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
   Future<CaseExportFile> exportCase(
     String id, {
     required String format,
+    bool includeAnalysis = true,
+    bool includeFeedback = true,
+    bool includeAnalysisHistory = true,
   }) async => CaseExportFile(
     filename: 'case.$format',
     contentType: format == 'json' ? 'application/json' : 'text/markdown',

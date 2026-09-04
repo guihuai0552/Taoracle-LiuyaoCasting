@@ -127,9 +127,7 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('删除这份档案？'),
-        content: Text(
-          '「${summary.question}」及其卦面、解读与反馈将被永久删除，且无法恢复。',
-        ),
+        content: Text('「${summary.question}」及其卦面、解读与反馈将被永久删除，且无法恢复。'),
         actions: [
           TextButton(
             key: const Key('archive-delete-cancel'),
@@ -381,10 +379,14 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
                         confirmDismiss: (_) => _confirmDeleteDialog(summary),
                         onDismissed: (_) {
                           // 同步先移除，避免被滑走的 Dismissible 仍留在树里。
+                          // 注意：必须用赋值新列表代替原地 removeWhere——
+                          // 数据源返回的可能是固定长度/不可变列表，原地
+                          // 修改会抛 UnsupportedError，导致 _deleteCase 不
+                          // 执行、档案实际未删除（2026-09 左滑删除 bug）。
                           setState(
-                            () => _cases.removeWhere(
-                              (item) => item.id == summary.id,
-                            ),
+                            () => _cases = _cases
+                                .where((item) => item.id != summary.id)
+                                .toList(),
                           );
                           _deleteCase(summary);
                         },
@@ -496,7 +498,8 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
       height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: _allTags.length +
+        itemCount:
+            _allTags.length +
             (_activeTags.isNotEmpty ? 1 : 0) +
             1, // 尾部固定「＋」新增标签入口。
         separatorBuilder: (_, _) => const SizedBox(width: 6),
@@ -545,10 +548,8 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
       showDragHandle: true,
       backgroundColor: _paper,
       isScrollControlled: true,
-      builder: (context) => _TagManagerSheet(
-        allTags: _allTags,
-        caseCountByTag: _tagCounts,
-      ),
+      builder: (context) =>
+          _TagManagerSheet(allTags: _allTags, caseCountByTag: _tagCounts),
     );
     if (mounted) _load();
   }
@@ -970,7 +971,9 @@ class _CaseCard extends StatelessWidget {
                                   color: DSColors.paper,
                                   borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: DSColors.amber.withValues(alpha: .55),
+                                    color: DSColors.amber.withValues(
+                                      alpha: .55,
+                                    ),
                                   ),
                                 ),
                                 child: Text(
@@ -1074,10 +1077,7 @@ class _ErrorCard extends StatelessWidget {
 /// 标签管理底部弹窗：新建自定义标签（持久化到偏好）、查看使用数量、
 /// 删除未挂载的自定义标签；已挂档案的标签随档案数据存在，不在此删除。
 class _TagManagerSheet extends StatefulWidget {
-  const _TagManagerSheet({
-    required this.allTags,
-    required this.caseCountByTag,
-  });
+  const _TagManagerSheet({required this.allTags, required this.caseCountByTag});
 
   final List<String> allTags;
   final Map<String, int> caseCountByTag;
@@ -1130,8 +1130,9 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
   @override
   Widget build(BuildContext context) {
     final customSet = _customTags.toSet();
-    final archivedTags =
-        widget.allTags.where((tag) => !customSet.contains(tag)).toList();
+    final archivedTags = widget.allTags
+        .where((tag) => !customSet.contains(tag))
+        .toList();
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,

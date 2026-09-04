@@ -67,6 +67,10 @@ abstract class ArchiveDataSource {
   });
   Future<CaseDetail> getCase(String id);
   Future<void> deleteCase(String id);
+  Future<void> updateQuestion({
+    required String caseId,
+    required String question,
+  });
   Future<void> updateQuestionContext({
     required String caseId,
     required String context,
@@ -76,6 +80,10 @@ abstract class ArchiveDataSource {
     required String caseId,
     required String body,
     required int expectedRevision,
+  });
+  Future<void> deleteAnalysis({
+    required String caseId,
+    required String analysisId,
   });
   Future<void> appendFeedback({
     required String caseId,
@@ -90,7 +98,13 @@ abstract class ArchiveDataSource {
     required String status,
     DateTime? occurredAt,
   });
-  Future<CaseExportFile> exportCase(String id, {required String format});
+  Future<CaseExportFile> exportCase(
+    String id, {
+    required String format,
+    bool includeAnalysis = true,
+    bool includeFeedback = true,
+    bool includeAnalysisHistory = true,
+  });
   Future<CaseExportFile> exportAllCases();
   Future<ArchiveImportPreview> inspectImport(String content);
   Future<ArchiveImportResult> importCases(
@@ -366,9 +380,9 @@ class ArchiveClient implements ArchiveDataSource {
           return activeTags.every(caseTags.contains);
         })
         .toList(growable: false);
-    return filtered
-        .map((json) => CaseSummary.fromJson(json))
-        .toList(growable: false);
+    // 返回可增长列表：调用方（档案页滑动删除等）会原地修改持有副本，
+    // 固定长度列表会让 removeWhere 抛 UnsupportedError（2026-09 bug）。
+    return filtered.map((json) => CaseSummary.fromJson(json)).toList();
   }
 
   static Set<String> _stringTags(Object? value) {
@@ -508,6 +522,28 @@ class ArchiveClient implements ArchiveDataSource {
   }
 
   @override
+  Future<void> updateQuestion({
+    required String caseId,
+    required String question,
+  }) async {
+    await _ensureLoaded();
+    final json = _store[caseId];
+    if (json == null) throw Exception('找不到案例：$caseId');
+    final normalized = question.trim();
+    if (normalized.length > 1_000) {
+      throw Exception('占问不能超过 1000 字');
+    }
+    // 留空与起卦时的占问口径一致：回落为「暂无问念」。
+    // 只改占问文本本身，不触碰起卦记录、历法快照与卦面快照（FR-CAS-005）。
+    final value = normalized.isEmpty ? '暂无问念' : normalized;
+    final now = DateTime.now().toIso8601String();
+    json['question'] = value;
+    json['questionUpdatedAt'] = now;
+    json['updatedAt'] = now;
+    await _persist();
+  }
+
+  @override
   Future<void> updateQuestionContext({
     required String caseId,
     required String context,
@@ -586,6 +622,27 @@ class ArchiveClient implements ArchiveDataSource {
   }
 
   @override
+  Future<void> deleteAnalysis({
+    required String caseId,
+    required String analysisId,
+  }) async {
+    await _ensureLoaded();
+    final json = _store[caseId];
+    if (json == null) throw Exception('找不到案例：$caseId');
+    final list = json['analyses'] as List? ?? const [];
+    final index = list.indexWhere(
+      (item) => item is Map && item['id'] == analysisId,
+    );
+    if (index < 0) throw Exception('找不到解读版本：$analysisId');
+    list.removeAt(index);
+    // 2026-09-04 需求：允许删除写得不满意的历史解读版本。
+    // latestAnalysisRevision 不回退，版本号保持单调递增（删除后留空洞），
+    // 乐观锁与后续新版本 revision 语义不受影响。
+    json['updatedAt'] = DateTime.now().toIso8601String();
+    await _persist();
+  }
+
+  @override
   Future<void> appendFeedback({
     required String caseId,
     required String body,
@@ -642,7 +699,13 @@ class ArchiveClient implements ArchiveDataSource {
   }
 
   @override
-  Future<CaseExportFile> exportCase(String id, {required String format}) async {
+  Future<CaseExportFile> exportCase(
+    String id, {
+    required String format,
+    bool includeAnalysis = true,
+    bool includeFeedback = true,
+    bool includeAnalysisHistory = true,
+  }) async {
     await _ensureLoaded();
     if (format != 'json' && format != 'markdown') {
       throw ArgumentError.value(format, 'format', '必须是 json 或 markdown');
@@ -657,6 +720,9 @@ class ArchiveClient implements ArchiveDataSource {
 
     final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
     if (format == 'json') {
+      // JSON 定位是完整数据与迁移载体，始终保留全部解读与反馈
+      // （FR-EXP-008：备份语义不做内容裁剪），内容选项仅作用于
+      // 人类可读的分享格式。
       return CaseExportFile(
         filename: 'liuyao-$stamp.json',
         contentType: 'application/json',
@@ -667,7 +733,12 @@ class ArchiveClient implements ArchiveDataSource {
     return CaseExportFile(
       filename: 'liuyao-$stamp.md',
       contentType: 'text/markdown',
-      content: _toMarkdown(json),
+      content: _toMarkdown(
+        json,
+        includeAnalysis: includeAnalysis,
+        includeFeedback: includeFeedback,
+        includeAnalysisHistory: includeAnalysisHistory,
+      ),
     );
   }
 
@@ -850,8 +921,17 @@ class ArchiveClient implements ArchiveDataSource {
     Map<String, dynamic> right,
   ) => jsonEncode(left) == jsonEncode(right);
 
-  /// 生成可读 Markdown 档案
-  String _toMarkdown(Map<String, dynamic> json) {
+  /// 生成可读 Markdown 档案。
+  ///
+  /// [includeAnalysis]/[includeFeedback] 为分享裁剪开关（2026-09-04 需求：
+  /// 有时只想分享卦本身）；[includeAnalysisHistory] 为 false 时解读只写
+  /// 最新一个版本。
+  String _toMarkdown(
+    Map<String, dynamic> json, {
+    bool includeAnalysis = true,
+    bool includeFeedback = true,
+    bool includeAnalysisHistory = true,
+  }) {
     final title = json['title'] as String? ?? '未命名';
     final question = json['question'] as String? ?? '';
     final castAt = json['castAt'] as String? ?? '';
@@ -872,9 +952,13 @@ class ArchiveClient implements ArchiveDataSource {
     buf.writeln();
 
     final analyses = json['analyses'] as List? ?? const [];
-    if (analyses.isNotEmpty) {
+    if (analyses.isNotEmpty && includeAnalysis) {
       buf.writeln('## 解读');
-      for (final a in analyses) {
+      // 仅最新版本时取追加列表最后一项（版本号最大）。
+      final visible = includeAnalysisHistory
+          ? analyses
+          : analyses.sublist(analyses.length - 1);
+      for (final a in visible) {
         final m = a as Map<String, dynamic>;
         buf.writeln('### 版本 ${m['revision']}（${m['createdAt']}）');
         buf.writeln(m['body'] as String? ?? '');
@@ -883,7 +967,7 @@ class ArchiveClient implements ArchiveDataSource {
     }
 
     final feedbacks = json['feedbacks'] as List? ?? const [];
-    if (feedbacks.isNotEmpty) {
+    if (feedbacks.isNotEmpty && includeFeedback) {
       buf.writeln('## 反馈');
       for (final f in feedbacks) {
         final m = f as Map<String, dynamic>;

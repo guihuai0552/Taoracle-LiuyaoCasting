@@ -393,4 +393,167 @@ void main() {
     expect(reloaded.chart.dayPillar, '庚寅');
     expect(reloaded.chart.dayVoid, '午未'); // 而非自动庚辰的申酉
   });
+
+  group('2026-09-04 需求：占问编辑与历史版本删除', () {
+    test('updateQuestion 修改占问落盘，重启后仍保留且不触碰卦面', () async {
+      final saved = await client.saveCast(
+        question: '原占问',
+        preview: makePreview(),
+      );
+      final chartBefore = jsonEncode(saved.chartJson);
+      await client.updateQuestion(caseId: saved.id, question: '改后的占问');
+      final fetched = await client.getCase(saved.id);
+      expect(fetched.question, '改后的占问');
+      expect(fetched.questionUpdatedAt, isNotNull);
+      // 卦面快照不受占问编辑影响（FR-CAS-005）。
+      expect(jsonEncode(fetched.chartJson), chartBefore);
+      // 模拟重启。
+      await ArchiveClient.resetForTesting();
+      final reloaded = await client.getCase(saved.id);
+      expect(reloaded.question, '改后的占问');
+    });
+
+    test('updateQuestion 空白回落「暂无问念」，超长拒绝', () async {
+      final saved = await client.saveCast(
+        question: '原占问',
+        preview: makePreview(),
+      );
+      await client.updateQuestion(caseId: saved.id, question: '   ');
+      expect((await client.getCase(saved.id)).question, '暂无问念');
+      expect(
+        () => client.updateQuestion(caseId: saved.id, question: '长' * 1001),
+        throwsException,
+      );
+    });
+
+    test('deleteAnalysis 删除指定版本，revision 不回退且后续新版本不冲突', () async {
+      final saved = await client.saveCast(
+        question: '版本删除',
+        preview: makePreview(),
+      );
+      await client.appendUserAnalysis(
+        caseId: saved.id,
+        body: '版本一',
+        expectedRevision: 0,
+      );
+      await client.appendUserAnalysis(
+        caseId: saved.id,
+        body: '版本二',
+        expectedRevision: 1,
+      );
+      await client.appendUserAnalysis(
+        caseId: saved.id,
+        body: '版本三',
+        expectedRevision: 2,
+      );
+      final detail = await client.getCase(saved.id);
+      await client.deleteAnalysis(
+        caseId: saved.id,
+        analysisId: detail.analyses[1].id, // 删除「版本二」
+      );
+      final after = await client.getCase(saved.id);
+      expect(after.analyses.map((a) => a.body), ['版本一', '版本三']);
+      // latestAnalysisRevision 保持 3，不因删除回退。
+      expect(after.latestAnalysisRevision, 3);
+      // 删除留下的空洞不影响乐观锁与后续追加：revision 取 4。
+      await client.appendUserAnalysis(
+        caseId: saved.id,
+        body: '版本四',
+        expectedRevision: 3,
+      );
+      final afterAppend = await client.getCase(saved.id);
+      expect(afterAppend.analyses.last.body, '版本四');
+      expect(afterAppend.analyses.last.revision, 4);
+      expect(afterAppend.latestAnalysisRevision, 4);
+      // 模拟重启后删除结果仍保留。
+      await ArchiveClient.resetForTesting();
+      final reloaded = await client.getCase(saved.id);
+      expect(reloaded.analyses.map((a) => a.body), ['版本一', '版本三', '版本四']);
+    });
+
+    test('deleteAnalysis 删除不存在的版本抛错且不改动数据', () async {
+      final saved = await client.saveCast(
+        question: '删除不存在',
+        preview: makePreview(),
+      );
+      expect(
+        () => client.deleteAnalysis(
+          caseId: saved.id,
+          analysisId: 'analysis-missing',
+        ),
+        throwsException,
+      );
+      expect((await client.getCase(saved.id)).analyses, isEmpty);
+    });
+  });
+
+  group('2026-09-04 需求：导出内容裁剪选项', () {
+    Future<String> seedCase() async {
+      final saved = await client.saveCast(
+        question: '导出裁剪',
+        preview: makePreview(),
+      );
+      await client.appendUserAnalysis(
+        caseId: saved.id,
+        body: '解读一',
+        expectedRevision: 0,
+      );
+      await client.appendUserAnalysis(
+        caseId: saved.id,
+        body: '解读二',
+        expectedRevision: 1,
+      );
+      await client.appendFeedback(
+        caseId: saved.id,
+        body: '反馈一',
+        status: 'matched',
+      );
+      return saved.id;
+    }
+
+    test('markdown 裁剪：不含解读/反馈，或仅最新解读版本', () async {
+      final id = await seedCase();
+      final full = await client.exportCase(id, format: 'markdown');
+      expect(full.content, contains('解读一'));
+      expect(full.content, contains('解读二'));
+      expect(full.content, contains('反馈一'));
+
+      final bare = await client.exportCase(
+        id,
+        format: 'markdown',
+        includeAnalysis: false,
+        includeFeedback: false,
+      );
+      expect(bare.content, isNot(contains('## 解读')));
+      expect(bare.content, isNot(contains('解读一')));
+      expect(bare.content, isNot(contains('## 反馈')));
+      expect(bare.content, isNot(contains('反馈一')));
+      // 卦面快照与占问仍在。
+      expect(bare.content, contains('## 占问'));
+      expect(bare.content, contains('完整卦面快照'));
+
+      final latestOnly = await client.exportCase(
+        id,
+        format: 'markdown',
+        includeAnalysisHistory: false,
+      );
+      expect(latestOnly.content, isNot(contains('解读一')));
+      expect(latestOnly.content, contains('解读二'));
+      expect(latestOnly.content, contains('反馈一'));
+    });
+
+    test('JSON 导出忽略裁剪参数，始终完整（备份语义）', () async {
+      final id = await seedCase();
+      final exported = await client.exportCase(
+        id,
+        format: 'json',
+        includeAnalysis: false,
+        includeFeedback: false,
+        includeAnalysisHistory: false,
+      );
+      final decoded = jsonDecode(exported.content) as Map<String, dynamic>;
+      expect((decoded['analyses'] as List).length, 2);
+      expect((decoded['feedbacks'] as List).length, 1);
+    });
+  });
 }

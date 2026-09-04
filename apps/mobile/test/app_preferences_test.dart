@@ -44,7 +44,10 @@ void main() {
     final reloaded = await loadPreferences();
 
     expect(reloaded.calendarPolicySetupCompleted, isTrue);
-    expect(reloaded.dayBoundaryStrategy, engine.dayBoundaryAstronomicalMidnight);
+    expect(
+      reloaded.dayBoundaryStrategy,
+      engine.dayBoundaryAstronomicalMidnight,
+    );
     expect(
       reloaded.monthBoundaryStrategy,
       engine.monthBoundaryAstronomicalMoment,
@@ -74,5 +77,32 @@ void main() {
     expect(prefs.showCastingRecord, isTrue);
     expect(prefs.calendarPolicySetupCompleted, isFalse);
     expect(prefs.monthBoundaryStrategy, engine.monthBoundarySolarTermZiHour);
+  });
+
+  test('2026-09-04 导出设置：默认未完成且含历史版本，保存后往返保留', () async {
+    // 默认值：未做过首启选择、默认包含历史版本（与既有导出行为一致）。
+    final defaults = await loadPreferences();
+    expect(defaults.exportSetupCompleted, isFalse);
+    expect(defaults.exportAnalysisHistoryDefault, isTrue);
+
+    // 旧偏好文件（无新字段）回退安全默认。
+    final file = File('${tempDir.path}/liuyao_settings.json');
+    await file.writeAsString('{"showNayin": true}');
+    resetPreferencesCacheForTest();
+    final legacy = await loadPreferences();
+    expect(legacy.exportSetupCompleted, isFalse);
+    expect(legacy.exportAnalysisHistoryDefault, isTrue);
+
+    // 首启选择「仅最新版本」后往返保留。
+    await savePreferences(
+      legacy.copyWith(
+        exportSetupCompleted: true,
+        exportAnalysisHistoryDefault: false,
+      ),
+    );
+    resetPreferencesCacheForTest();
+    final reloaded = await loadPreferences();
+    expect(reloaded.exportSetupCompleted, isTrue);
+    expect(reloaded.exportAnalysisHistoryDefault, isFalse);
   });
 }
