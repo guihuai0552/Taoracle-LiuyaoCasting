@@ -351,6 +351,20 @@ Map<String, dynamic> _castingTrace(Map<String, dynamic> record) {
 /// 核心排盘函数
 /// ============================================================================
 
+/// 校验手动四柱：四柱齐全，且每柱均为六十甲子内的合法干支组合。
+void _validateManualPillars(Map<String, String> pillars) {
+  const positions = ['year', 'month', 'day', 'hour'];
+  for (final position in positions) {
+    final ganZhi = pillars[position];
+    if (ganZhi == null || ganZhi.isEmpty) {
+      throw ArgumentError('manualPillars 缺少 $position 柱');
+    }
+    if (!the60HeavenlyEarth.contains(ganZhi)) {
+      throw ArgumentError('manualPillars.$position「$ganZhi」不是合法干支组合');
+    }
+  }
+}
+
 /// 完整排盘（对标 Python cast_chart）
 ///
 /// 参数:
@@ -358,6 +372,10 @@ Map<String, dynamic> _castingTrace(Map<String, dynamic> record) {
 /// - lineValues: 手动输入的6个爻值（6/7/8/9），null 表示自动摇卦
 /// - seed: 随机种子（仅自动摇卦时有效）
 /// - castingMethod: 'manual' | 'three_coins' | 'time_pillar'
+/// - manualPillars: 手动填写的四柱干支（仅 manual 模式），形如
+///   {'year': '甲子', 'month': '丙寅', 'day': '庚午', 'hour': '壬子'}。
+///   提供时以其替代自动历法四柱：六神、旬空、十二长生、神煞等全部
+///   按手动四柱计算；农历/节气上下文仍按 timestamp 生成，仅作追溯。
 ///
 /// 返回: schema v12 完整结构
 Map<String, dynamic> castChart({
@@ -367,10 +385,18 @@ Map<String, dynamic> castChart({
   String castingMethod = 'three_coins',
   String dayBoundary = dayBoundaryCivil23NextDay,
   String monthBoundary = monthBoundarySolarTermZiHour,
+  Map<String, String>? manualPillars,
 }) {
   // 1. 验证参数
   if (!['manual', 'three_coins', 'time_pillar'].contains(castingMethod)) {
     throw ArgumentError('castingMethod 必须是 manual、three_coins 或 time_pillar');
+  }
+
+  if (manualPillars != null && castingMethod != 'manual') {
+    throw ArgumentError('manualPillars 仅在 manual 模式下有效');
+  }
+  if (manualPillars != null) {
+    _validateManualPillars(manualPillars);
   }
 
   if (castingMethod == 'manual') {
@@ -424,14 +450,26 @@ Map<String, dynamic> castChart({
     );
   }
 
-  // 3. 万年历（四柱）
+  // 3. 万年历（四柱）；手动四柱提供时以手动值覆盖，
+  // 使六神（日干起）、旬空（日柱旬）、十二长生与神煞全部按手动四柱计算。
   final projectPillars = <String, Map<String, String>>{};
-  for (final p in almanac['four_pillars'] as List) {
-    projectPillars[p['position']] = {
-      'gan_zhi': p['ganzhi'],
-      'stem': p['stem'],
-      'branch': p['branch'],
-    };
+  if (manualPillars != null) {
+    for (final position in const ['year', 'month', 'day', 'hour']) {
+      final ganZhi = manualPillars[position]!;
+      projectPillars[position] = {
+        'gan_zhi': ganZhi,
+        'stem': ganZhi[0],
+        'branch': ganZhi[1],
+      };
+    }
+  } else {
+    for (final p in almanac['four_pillars'] as List) {
+      projectPillars[p['position']] = {
+        'gan_zhi': p['ganzhi'],
+        'stem': p['stem'],
+        'branch': p['branch'],
+      };
+    }
   }
 
   // 4. 旬空
@@ -560,7 +598,10 @@ Map<String, dynamic> castChart({
     },
     'steps': [
       '将起卦时刻转换为 Asia/Shanghai 本地时间',
-      '通过 Dart DateTime 计算四柱干支',
+      if (manualPillars != null)
+        '使用手动填写的四柱干支（年/月/日/时）替代自动推算'
+      else
+        '通过 Dart DateTime 计算四柱干支',
       '分别以年、月、日、时四柱干支计算各柱旬空',
       '日柱 ${projectPillars['day']!['gan_zhi']} 旬空 ${dayVoid.voidText}，并以日干起六神',
     ],
@@ -618,7 +659,7 @@ Map<String, dynamic> castChart({
     'time': {
       'timezone': 'Asia/Shanghai',
       'rule_status': 'provisional',
-      'source': 'dart_almanac',
+      'source': manualPillars != null ? 'manual_input' : 'dart_almanac',
       'year': projectPillars['year']!['gan_zhi'],
       'month': projectPillars['month']!['gan_zhi'],
       'day': projectPillars['day']!['gan_zhi'],
@@ -746,11 +787,15 @@ Map<String, dynamic> timePillarCast(
 }
 
 /// 手动输入卦象
+///
+/// [manualPillars] 为手动填写的四柱干支（可选），提供时六神、旬空等
+/// 全部按手动四柱计算，替代按 [timestamp] 自动推算的历法四柱。
 Map<String, dynamic> manualCast(
   DateTime timestamp,
   List<int> lineValues, {
   String dayBoundary = dayBoundaryCivil23NextDay,
   String monthBoundary = monthBoundarySolarTermZiHour,
+  Map<String, String>? manualPillars,
 }) {
   return castChart(
     timestamp: timestamp,
@@ -758,5 +803,6 @@ Map<String, dynamic> manualCast(
     lineValues: lineValues,
     dayBoundary: dayBoundary,
     monthBoundary: monthBoundary,
+    manualPillars: manualPillars,
   );
 }

@@ -225,18 +225,26 @@ void main() {
 
     // 卦面规则层：山天大畜（纳支 子寅辰戌子寅）element 参照逐爻验证。
     final result = manualCast(DateTime.parse('2026-08-04T22:22:29+08:00'), [
-      7, 7, 9, 8, 8, 7,
+      7,
+      7,
+      9,
+      8,
+      8,
+      7,
     ]);
-    final stages = (result['annotations'] as Map)['five_element_twelve_stages']
-        as Map;
+    final stages =
+        (result['annotations'] as Map)['five_element_twelve_stages'] as Map;
     final lineResults = (stages['line_results'] as List)
         .cast<Map<String, dynamic>>();
     String stageAt(int position, String reference) {
-      final line = lineResults.singleWhere((item) => item['position'] == position);
+      final line = lineResults.singleWhere(
+        (item) => item['position'] == position,
+      );
       final pillars = (line['pillar_results'] as List)
           .cast<Map<String, dynamic>>();
-      return pillars
-          .singleWhere((item) => item['reference'] == reference)['stage']
+      return pillars.singleWhere(
+            (item) => item['reference'] == reference,
+          )['stage']
           as String;
     }
 
@@ -534,8 +542,11 @@ void main() {
         (second['casting_record'] as Map)['raw_input'] as Map<String, dynamic>;
     expect(firstRaw['ke_pillar'], '壬午');
     expect(firstRaw['inner_trigram'], '乾'); // 壬纳甲乾
-    expect((first['hexagram'] as Map<String, dynamic>)['base']
-        as Map<String, dynamic>, isNotNull);
+    expect(
+      (first['hexagram'] as Map<String, dynamic>)['base']
+          as Map<String, dynamic>,
+      isNotNull,
+    );
     expect(secondRaw['ke_pillar'], '癸未');
     expect(secondRaw['inner_trigram'], '坤'); // 癸纳甲坤
     expect(secondRaw['inner_trigram'], isNot(firstRaw['inner_trigram']));
@@ -599,7 +610,12 @@ void main() {
   test('六冲六合：buildBaseChart 输出字段与卦面联动', () {
     // 乾为天六爻全动 → 变坤为地，两者皆六冲
     final dry = manualCast(DateTime.parse('2026-08-04T22:22:29+08:00'), [
-      9, 9, 9, 9, 9, 9,
+      9,
+      9,
+      9,
+      9,
+      9,
+      9,
     ]);
     final dryHex = dry['hexagram'] as Map<String, dynamic>;
     final dryBase = dryHex['base'] as Map<String, dynamic>;
@@ -614,7 +630,12 @@ void main() {
 
     // 天地否（静卦，无动爻）→ 六合，且无变卦
     final fou = manualCast(DateTime.parse('2026-08-04T22:22:29+08:00'), [
-      8, 8, 8, 7, 7, 7,
+      8,
+      8,
+      8,
+      7,
+      7,
+      7,
     ]);
     final fouHex = fou['hexagram'] as Map<String, dynamic>;
     final fouBase = fouHex['base'] as Map<String, dynamic>;
@@ -626,7 +647,12 @@ void main() {
 
     // 山天大畜（普通卦）→ 两字段均为 false，property 为 null
     final xu = manualCast(DateTime.parse('2026-08-04T22:22:29+08:00'), [
-      7, 7, 9, 8, 8, 7,
+      7,
+      7,
+      9,
+      8,
+      8,
+      7,
     ]);
     final xuHex = xu['hexagram'] as Map<String, dynamic>;
     final xuBase = xuHex['base'] as Map<String, dynamic>;
@@ -634,5 +660,130 @@ void main() {
     expect(xuBase['liu_chong'], isFalse);
     expect(xuBase['liu_he'], isFalse);
     expect(xuBase['hexagram_property'], isNull);
+  });
+
+  group('手动四柱排盘（manualPillars）', () {
+    final timestamp = DateTime.parse('2026-09-03T10:30:00+08:00');
+    const lines = [7, 7, 7, 8, 8, 8];
+
+    List<String> sixGodsOf(Map<String, dynamic> result) =>
+        (((result['hexagram'] as Map)['base'] as Map)['lines'] as List)
+            .map((line) => (line as Map)['six_god'] as String)
+            .toList();
+
+    test('六神按手动日柱天干起（甲日青龙起初爻，丙日朱雀起初爻）', () {
+      final jiaDay = manualCast(
+        timestamp,
+        lines,
+        manualPillars: const {
+          'year': '丙午',
+          'month': '丙申',
+          'day': '甲子',
+          'hour': '己巳',
+        },
+      );
+      expect(sixGodsOf(jiaDay), ['青龙', '朱雀', '勾陈', '螣蛇', '白虎', '玄武']);
+
+      final bingDay = manualCast(
+        timestamp,
+        lines,
+        manualPillars: const {
+          'year': '丙午',
+          'month': '丙申',
+          'day': '丙寅',
+          'hour': '癸巳',
+        },
+      );
+      expect(sixGodsOf(bingDay), ['朱雀', '勾陈', '螣蛇', '白虎', '玄武', '青龙']);
+    });
+
+    test('手动四柱覆盖 time 段与旬空：甲子旬空戌亥', () {
+      final result = manualCast(
+        timestamp,
+        lines,
+        manualPillars: const {
+          'year': '丙午',
+          'month': '丙申',
+          'day': '甲子',
+          'hour': '己巳',
+        },
+      );
+      final time = result['time'] as Map<String, dynamic>;
+      expect(time['source'], 'manual_input');
+      expect(time['year'], '丙午');
+      expect(time['month'], '丙申');
+      expect(time['day'], '甲子');
+      expect(time['hour'], '己巳');
+      expect(time['day_void'], '戌亥');
+      // 六神轨迹描述以手动日柱为准。
+      final trace = (result['calculation_trace'] as List)
+          .whereType<Map>()
+          .firstWhere((t) => t['rule_id'] == 'chart.time_context.cnlunar.v1');
+      expect((trace['steps'] as List).contains('日柱 甲子 旬空 戌亥，并以日干起六神'), isTrue);
+    });
+
+    test('私鉴合同与标注层的日柱/旬空随手动四柱（一致性）', () {
+      final result = manualCast(
+        timestamp,
+        lines,
+        manualPillars: const {
+          'year': '丙午',
+          'month': '丙申',
+          'day': '甲子',
+          'hour': '己巳',
+        },
+      );
+      // 私鉴合同：calendar 段的四柱与旬空取手动值，不与 almanac 混用。
+      final contract = result['private_reference_contract'] as Map;
+      final calendar = contract['calendar'] as Map;
+      expect(calendar['day_ganzhi'], '甲子');
+      expect((calendar['xun_kong'] as List).join(), '戌亥');
+      expect(calendar['year_ganzhi'], '丙午');
+      // 十二长生标注按手动日柱推算（参照日支为手动甲子的「子」）。
+      final annotations = result['annotations'] as Map;
+      final stages = annotations['five_element_twelve_stages'] as Map;
+      expect(stages['rule_id'], isNotNull);
+      final stageTrace = (result['calculation_trace'] as List)
+          .whereType<Map>()
+          .firstWhere((t) => (t['rule_id'] as String).contains('twelve'));
+      expect((stageTrace['steps'] as List).join(), contains('初爻水：日支子 → 帝旺'));
+    });
+
+    test('不传 manualPillars 时保持自动推算（回归保护）', () {
+      final auto = manualCast(timestamp, lines);
+      final time = auto['time'] as Map<String, dynamic>;
+      expect(time['source'], 'dart_almanac');
+      expect(time['day'], '庚辰'); // 2026-09-03 自动日柱
+      expect(sixGodsOf(auto), ['白虎', '玄武', '青龙', '朱雀', '勾陈', '螣蛇']);
+    });
+
+    test('非法干支组合与非 manual 模式被拒绝', () {
+      expect(
+        () => manualCast(
+          timestamp,
+          lines,
+          manualPillars: const {
+            'year': '丙午',
+            'month': '丙申',
+            'day': '甲丑', // 甲丑不在六十甲子
+            'hour': '己巳',
+          },
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => castChart(
+          timestamp: timestamp,
+          castingMethod: 'three_coins',
+          manualPillars: const {
+            'year': '丙午',
+            'month': '丙申',
+            'day': '甲子',
+            'hour': '己巳',
+          },
+        ),
+        throwsArgumentError,
+      );
+    });
   });
 }

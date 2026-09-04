@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:liuyao_engine/liuyao_engine.dart' as engine;
 import 'package:path_provider/path_provider.dart';
 
 import '../casting/casting_models.dart';
@@ -393,16 +394,29 @@ class ArchiveClient implements ArchiveDataSource {
         ? preview.baseHexagram
         : title.trim();
 
-    // 手动四柱模式下，chart 快照同步覆盖四柱显示值；自动计算值仍保留在
-    // fourPillarsContext.calculated 供追溯，rawJson 本身不变。
-    final chartJson =
-        preview.fourPillarsSource == 'manual' &&
-            preview.manualFourPillars != null
-        ? _applyManualPillarsToChart(preview)
-        : preview.rawJson;
-    final autoTime =
-        preview.rawJson['time'] as Map<String, dynamic>? ??
-        const <String, dynamic>{};
+    // 手动四柱模式下引擎已直接按手动四柱排盘（chart 的 time 段即手动值，
+    // source=manual_input）；自动推算的四柱单独重算一份保留在
+    // fourPillarsContext.calculated 供追溯。
+    final calendarPolicy =
+        preview.rawJson['calendar_policy'] as Map<String, dynamic>? ??
+        <String, dynamic>{
+          'dayBoundary': 'civil_23_next_day',
+          'monthBoundary': 'solar_term_zi_hour',
+          'timezone': 'Asia/Shanghai',
+        };
+    final calculatedPillars = preview.fourPillarsSource == 'manual'
+        ? _calculateAutoPillars(preview.castAt, calendarPolicy)
+        : () {
+            final autoTime =
+                preview.rawJson['time'] as Map<String, dynamic>? ??
+                const <String, dynamic>{};
+            return <String, String>{
+              'year': autoTime['year'] as String? ?? preview.yearPillar,
+              'month': autoTime['month'] as String? ?? preview.monthPillar,
+              'day': autoTime['day'] as String? ?? preview.dayPillar,
+              'hour': autoTime['hour'] as String? ?? preview.hourPillar,
+            };
+          }();
 
     final json = <String, dynamic>{
       'id': id,
@@ -413,21 +427,10 @@ class ArchiveClient implements ArchiveDataSource {
       'questionContextUpdatedAt': null,
       'castAt': preview.castAt.toIso8601String(),
       'castingMethod': preview.castingRecord.method,
-      'calendarPolicy':
-          preview.rawJson['calendar_policy'] ??
-          <String, dynamic>{
-            'dayBoundary': 'civil_23_next_day',
-            'monthBoundary': 'solar_term_zi_hour',
-            'timezone': 'Asia/Shanghai',
-          },
+      'calendarPolicy': calendarPolicy,
       'fourPillarsContext': <String, dynamic>{
         'source': preview.fourPillarsSource,
-        'calculated': <String, String>{
-          'year': autoTime['year'] as String? ?? preview.yearPillar,
-          'month': autoTime['month'] as String? ?? preview.monthPillar,
-          'day': autoTime['day'] as String? ?? preview.dayPillar,
-          'hour': autoTime['hour'] as String? ?? preview.hourPillar,
-        },
+        'calculated': calculatedPillars,
         'manual': preview.manualFourPillars?.toJson(),
       },
       'displayContext': <String, dynamic>{
@@ -444,7 +447,9 @@ class ArchiveClient implements ArchiveDataSource {
       'latestAnalysisRevision': 0,
       'createdAt': now.toIso8601String(),
       'updatedAt': now.toIso8601String(),
-      'chart': chartJson,
+      // 手动四柱模式下，引擎排盘结果（rawJson）的 time 段即手动四柱
+      // （source=manual_input），六神/旬空等已按手动日柱计算。
+      'chart': preview.rawJson,
       'analyses': <Map<String, dynamic>>[],
       'feedbacks': <Map<String, dynamic>>[],
     };
@@ -454,20 +459,33 @@ class ArchiveClient implements ArchiveDataSource {
     return CaseDetail.fromJson(json);
   }
 
-  /// 把手动四柱覆盖写回 chart 快照的 time 段（不改动 [CastPreview.rawJson]）。
-  static Map<String, dynamic> _applyManualPillarsToChart(CastPreview preview) {
-    final manual = preview.manualFourPillars;
-    if (manual == null) return preview.rawJson;
-    final chart = Map<String, dynamic>.from(preview.rawJson);
-    final time = Map<String, dynamic>.from(
-      chart['time'] as Map<String, dynamic>? ?? const <String, dynamic>{},
-    );
-    time['year'] = manual.year;
-    time['month'] = manual.month;
-    time['day'] = manual.day;
-    time['hour'] = manual.hour;
-    chart['time'] = time;
-    return chart;
+  /// 按起卦时间与历法口径自动推算四柱（用于手动四柱档案的
+  /// fourPillarsContext.calculated 溯源记录；失败时回退空表）。
+  static Map<String, String> _calculateAutoPillars(
+    DateTime castAt,
+    Map<String, dynamic> calendarPolicy,
+  ) {
+    try {
+      final almanac = engine.calculateAlmanac(
+        castAt,
+        timezoneName: 'Asia/Shanghai',
+        dayBoundary:
+            calendarPolicy['dayBoundary'] as String? ??
+            engine.dayBoundaryCivil23NextDay,
+        monthBoundary:
+            calendarPolicy['monthBoundary'] as String? ??
+            engine.monthBoundarySolarTermZiHour,
+      );
+      final pillars = <String, String>{};
+      for (final p in almanac['four_pillars'] as List) {
+        final entry = p as Map<String, dynamic>;
+        pillars[entry['position'] as String] = entry['ganzhi'] as String;
+      }
+      if (pillars.length == 4) return pillars;
+    } on Object {
+      // 推算失败时保留空溯源，不影响档案主数据。
+    }
+    return const <String, String>{};
   }
 
   @override
@@ -629,8 +647,13 @@ class ArchiveClient implements ArchiveDataSource {
     if (format != 'json' && format != 'markdown') {
       throw ArgumentError.value(format, 'format', '必须是 json 或 markdown');
     }
-    final json = _store[id];
-    if (json == null) throw Exception('找不到案例：$id');
+    final stored = _store[id];
+    if (stored == null) throw Exception('找不到案例：$id');
+
+    // 旧手动四柱档案的快照经解析层校正后再导出，保证与详情页、
+    // 图片导出展示一致。
+    final correctedChart = CaseDetail.fromJson(stored).chartJson;
+    final json = _deepCopy(stored)..['chart'] = correctedChart;
 
     final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
     if (format == 'json') {

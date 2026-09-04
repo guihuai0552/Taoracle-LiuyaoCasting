@@ -394,6 +394,24 @@ class ManualFourPillars {
       _all(_stemValid(dayGan), _branchValid(dayZhi)) &&
       _all(_stemValid(hourGan), _branchValid(hourZhi));
 
+  /// 引擎可用的四柱干支 Map（{'year': '甲子', ...}）。
+  Map<String, String> toPillarsMap() => <String, String>{
+    'year': year,
+    'month': month,
+    'day': day,
+    'hour': hour,
+  };
+
+  /// 干支组合不在六十甲子内的柱位（如「甲丑」），返回中文柱名列表。
+  List<String> invalidPillarNames() {
+    const labels = {'year': '年柱', 'month': '月柱', 'day': '日柱', 'hour': '时柱'};
+    return [
+      for (final entry in toPillarsMap().entries)
+        if (!engine.the60HeavenlyEarth.contains(entry.value))
+          labels[entry.key]!,
+    ];
+  }
+
   static bool _all(bool first, bool second) => first && second;
 
   static bool _stemValid(String value) => heavenlyStems.contains(value);

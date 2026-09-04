@@ -9,6 +9,7 @@ abstract class CastingDataSource {
     required List<int> lineValues,
     String dayBoundary = engine.dayBoundaryCivil23NextDay,
     String monthBoundary = engine.monthBoundarySolarTermZiHour,
+    Map<String, String>? manualPillars,
   });
 
   Future<CastPreview> previewAutomatic({
@@ -39,6 +40,7 @@ class CastingClient implements CastingDataSource {
     required List<int> lineValues,
     String dayBoundary = engine.dayBoundaryCivil23NextDay,
     String monthBoundary = engine.monthBoundarySolarTermZiHour,
+    Map<String, String>? manualPillars,
   }) async {
     if (lineValues.length != 6 ||
         lineValues.any((value) => !const {6, 7, 8, 9}.contains(value))) {
@@ -50,6 +52,7 @@ class CastingClient implements CastingDataSource {
         lineValues,
         dayBoundary: dayBoundary,
         monthBoundary: monthBoundary,
+        manualPillars: manualPillars,
       ),
       question: question,
     );

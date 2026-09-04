@@ -189,9 +189,16 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
       return;
     }
     final question = rawQuestion.isEmpty ? '暂无问念' : rawQuestion;
-    if (_fourPillarsSource == 'manual' && !_manualFourPillars.isComplete) {
-      setState(() => _error = '手动四柱需填齐四柱的天干地支');
-      return;
+    if (_fourPillarsSource == 'manual') {
+      if (!_manualFourPillars.isComplete) {
+        setState(() => _error = '手动四柱需填齐四柱的天干地支');
+        return;
+      }
+      final invalid = _manualFourPillars.invalidPillarNames();
+      if (invalid.isNotEmpty) {
+        setState(() => _error = '${invalid.join('、')}的干支组合不在六十甲子内，请重新选择');
+        return;
+      }
     }
     FocusScope.of(context).unfocus();
     setState(() => _error = null);
@@ -216,14 +223,18 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
       _error = null;
     });
     try {
+      // 手动四柱直接交引擎排盘：六神、旬空、十二长生等全部按手动日柱
+      // （六神按日干）计算，而不是先自动排盘再覆盖显示文本。
+      final isManual = _fourPillarsSource == 'manual';
       var preview = await _dataSource.previewManual(
         question: question,
         dateTime: _dateTime,
         lineValues: _lineValues,
         dayBoundary: _dayBoundary,
         monthBoundary: _monthBoundary,
+        manualPillars: isManual ? _manualFourPillars.toPillarsMap() : null,
       );
-      if (_fourPillarsSource == 'manual') {
+      if (isManual) {
         preview = preview.applyManualFourPillars(_manualFourPillars);
       }
       final detail = await _archiveClient.saveCast(
@@ -347,15 +358,18 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
                 style: ButtonStyle(
                   visualDensity: VisualDensity.compact,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  side: const WidgetStatePropertyAll(BorderSide(color: _cinnabar)),
+                  side: const WidgetStatePropertyAll(
+                    BorderSide(color: _cinnabar),
+                  ),
                   backgroundColor: WidgetStateProperty.resolveWith(
                     (states) => states.contains(WidgetState.selected)
                         ? _cinnabar
                         : _softPaper,
                   ),
                   foregroundColor: WidgetStateProperty.resolveWith(
-                    (states) =>
-                        states.contains(WidgetState.selected) ? Colors.white : _ink,
+                    (states) => states.contains(WidgetState.selected)
+                        ? Colors.white
+                        : _ink,
                   ),
                 ),
                 onSelectionChanged: (selection) {
