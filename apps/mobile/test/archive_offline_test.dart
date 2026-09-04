@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liuyao_engine/liuyao_engine.dart';
 import 'package:liuyao_archive/src/features/casting/casting_models.dart';
 import 'package:liuyao_archive/src/features/archive/archive_client.dart';
+import 'package:liuyao_archive/src/features/archive/draft_store.dart';
 import 'package:liuyao_archive/src/features/archive/archive_models.dart';
 
 /// 存档离线测试：验证 saveCast / listCases / getCase / append* / exportCase
@@ -554,6 +555,65 @@ void main() {
       final decoded = jsonDecode(exported.content) as Map<String, dynamic>;
       expect((decoded['analyses'] as List).length, 2);
       expect((decoded['feedbacks'] as List).length, 1);
+    });
+  });
+
+  /// 2026-09-05 需求：解读草稿存取（draft_store）——保存/读取/清除往返，
+  /// 空文本等价清除；caseId 过滤到安全文件名字符。
+  group('2026-09-05 需求：解读草稿保护', () {
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('liuyao_draft_test');
+      draftDirectoryOverride = () async => tempDir;
+      resetDraftCacheForTest();
+    });
+
+    tearDown(() async {
+      draftDirectoryOverride = null;
+      resetDraftCacheForTest();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('草稿保存后可读取，清空文本即清除', () async {
+      await saveAnalysisDraft('case-a', '写到一半的解读');
+      expect(await loadAnalysisDraft('case-a'), '写到一半的解读');
+      // 空文本 = 无草稿。
+      await saveAnalysisDraft('case-a', '   ');
+      expect(await loadAnalysisDraft('case-a'), isEmpty);
+      // 无草稿的 case 返回空串。
+      expect(await loadAnalysisDraft('case-b'), isEmpty);
+    });
+
+    test('不同 caseId 草稿互不串扰，特殊字符 id 不越界', () async {
+      await saveAnalysisDraft('case-a', 'A 的草稿');
+      await saveAnalysisDraft('../evil/../case-b', 'B 的草稿');
+      expect(await loadAnalysisDraft('case-a'), 'A 的草稿');
+      expect(await loadAnalysisDraft('../evil/../case-b'), 'B 的草稿');
+      // 独立审查加强：目录内只允许白名单形态的草稿文件名
+      // （恒真的 startsWith 断言不构成有效校验）。
+      final namePattern = RegExp(r'^draft-analysis-[A-Za-z0-9_-]+\.txt$');
+      final names = tempDir.listSync().map((entry) {
+        final segments = entry.path.split(Platform.pathSeparator);
+        return segments.last;
+      }).toList();
+      expect(names, isNotEmpty);
+      expect(names.every(namePattern.hasMatch), isTrue);
+    });
+
+    test('删除档案场景：空文本清理会移除磁盘草稿文件', () async {
+      // 独立审查修复回归：_confirmDelete 兑现「永久删除」承诺，
+      // 删档时以空文本调用 saveAnalysisDraft——磁盘文件须真被移除，
+      // 而非写入空内容留下孤儿文件。
+      await saveAnalysisDraft('case-doomed', '未保存的解读草稿');
+      final file = File('${tempDir.path}/draft-analysis-case-doomed.txt');
+      expect(await file.exists(), isTrue);
+
+      // 详情页删除档案时的清理调用（fire-and-forget）。
+      await saveAnalysisDraft('case-doomed', '');
+
+      expect(await file.exists(), isFalse);
+      expect(await loadAnalysisDraft('case-doomed'), isEmpty);
     });
   });
 }

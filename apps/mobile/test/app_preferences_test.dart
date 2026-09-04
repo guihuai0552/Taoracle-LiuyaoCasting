@@ -105,4 +105,32 @@ void main() {
     expect(reloaded.exportSetupCompleted, isTrue);
     expect(reloaded.exportAnalysisHistoryDefault, isFalse);
   });
+
+  test('2026-09-05 字体设置：默认 system/daoyu，往返保留且非法值回退', () async {
+    // 默认与现状一致：界面系统字体、导出道谕宋（老用户升级无感）。
+    final defaults = await loadPreferences();
+    expect(defaults.uiFontFamily, kUiFontSystem);
+    expect(defaults.exportFontFamily, kExportFontDaoyu);
+
+    // 选择后往返保留。
+    await savePreferences(
+      defaults.copyWith(uiFontFamily: 'daoyu', exportFontFamily: 'system'),
+    );
+    resetPreferencesCacheForTest();
+    final reloaded = await loadPreferences();
+    expect(reloaded.uiFontFamily, 'daoyu');
+    expect(reloaded.exportFontFamily, 'system');
+    // 保存时同步全局通知器（MaterialApp 主题据此即时重建）。
+    expect(uiFontFamilyNotifier.value, 'daoyu');
+
+    // 非法值（损坏文件注入）回退安全默认，不透传到 fontFamily。
+    final file = File('${tempDir.path}/liuyao_settings.json');
+    await file.writeAsString(
+      '{"uiFontFamily": "ComicSans", "exportFontFamily": 42}',
+    );
+    resetPreferencesCacheForTest();
+    final corrupted = await loadPreferences();
+    expect(corrupted.uiFontFamily, kUiFontSystem);
+    expect(corrupted.exportFontFamily, kExportFontDaoyu);
+  });
 }

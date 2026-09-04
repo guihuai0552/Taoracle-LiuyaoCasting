@@ -14,7 +14,7 @@ import 'ui/design_system/components/ds_bottom_navigation.dart';
 import 'ui/design_system/components/liuyao_icon.dart';
 import 'ui/liuyao_design.dart';
 
-class LiuyaoArchiveApp extends StatelessWidget {
+class LiuyaoArchiveApp extends StatefulWidget {
   const LiuyaoArchiveApp({
     super.key,
     this.almanacDataSource,
@@ -25,11 +25,46 @@ class LiuyaoArchiveApp extends StatelessWidget {
   final CastingDataSource? castingDataSource;
 
   @override
+  State<LiuyaoArchiveApp> createState() => _LiuyaoArchiveAppState();
+}
+
+class _LiuyaoArchiveAppState extends State<LiuyaoArchiveApp> {
+  // 2026-09-05 需求：产品内字体可在设置页切换（系统默认 / 道谕宋），
+  // 经全局 notifier 即时重建主题，无需重启。卦面排盘组件显式锁定
+  // 道谕宋，不参与切换，排盘排版不受影响。
+  String _uiFontFamily = kUiFontSystem;
+
+  @override
+  void initState() {
+    super.initState();
+    _uiFontFamily = uiFontFamilyNotifier.value;
+    uiFontFamilyNotifier.addListener(_onUiFontChanged);
+  }
+
+  @override
+  void dispose() {
+    uiFontFamilyNotifier.removeListener(_onUiFontChanged);
+    super.dispose();
+  }
+
+  void _onUiFontChanged() {
+    if (mounted) setState(() => _uiFontFamily = uiFontFamilyNotifier.value);
+  }
+
+  ThemeData _buildTheme() {
+    final theme = buildLiuyaoTheme();
+    if (_uiFontFamily == kUiFontSystem) return theme;
+    return theme.copyWith(
+      textTheme: theme.textTheme.apply(fontFamily: 'DaoyuSong'),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: '道谕六爻',
-      theme: buildLiuyaoTheme(),
+      theme: _buildTheme(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -42,8 +77,8 @@ class LiuyaoArchiveApp extends StatelessWidget {
         child: child ?? const SizedBox.shrink(),
       ),
       home: HomeShell(
-        almanacDataSource: almanacDataSource,
-        castingDataSource: castingDataSource,
+        almanacDataSource: widget.almanacDataSource,
+        castingDataSource: widget.castingDataSource,
       ),
     );
   }

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:liuyao_engine/liuyao_engine.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -14,6 +16,7 @@ import '../settings/app_preferences.dart';
 import 'archive_client.dart';
 import 'archive_image_export.dart';
 import 'archive_models.dart';
+import 'draft_store.dart';
 
 const _mutedInk = LiuyaoColors.inkMuted;
 const _cinnabar = LiuyaoColors.cinnabar;
@@ -42,6 +45,10 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
   final _analysisController = TextEditingController();
   bool _savingAnalysis = false;
   bool _exporting = false;
+  // 放大镜模式（2026-09-05 需求）：截取 body 当前视口为图片后全屏只读
+  // 放大查看，与排盘渲染、页面按键完全隔离。
+  final GlobalKey _magnifierBoundaryKey = GlobalKey();
+  bool _magnifying = false;
   String? _error;
 
   // 卦面标注显示状态（与十二长生表、卦面爻位标注联动）。
@@ -82,7 +89,39 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     _showFiveStars = prefs.showFiveStarsAndMansions;
     _show28Mansions = prefs.showFiveStarsAndMansions;
     _showTwelveGrowth = prefs.showShenshaAndTwelveGrowth;
+    // 2026-09-05 需求：恢复上次未保存的解读草稿（误退出/应用被杀后
+    // 重进可继续编辑）。fire-and-forget：读取失败静默，不阻塞首帧。
+    unawaited(_restoreAnalysisDraft());
+    // 未保存文本实时落盘（尽力而为），配合返回拦截双层防丢失。
+    _analysisController.addListener(_persistAnalysisDraft);
   }
+
+  Future<void> _restoreAnalysisDraft() async {
+    final draft = await loadAnalysisDraft(_detail.id);
+    if (!mounted || draft.trim().isEmpty) return;
+    // 已保存过的内容（或更新的输入）不回退：草稿只恢复「丢失的部分」。
+    if (draft.trim() == (_latestUserAnalysis?.body ?? '').trim()) return;
+    if (draft.trim() == _analysisController.text.trim()) return;
+    _analysisController.value = TextEditingValue(text: draft);
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已恢复未保存的解读草稿')));
+    }
+  }
+
+  void _persistAnalysisDraft() {
+    unawaited(saveAnalysisDraft(_detail.id, _analysisController.text));
+    // PopScope.canPop 在 build 时求值：未保存状态翻转时刷新一次，
+    // 让返回拦截跟随输入生效（状态未变则不重建，避免逐键 setState）。
+    final has = _hasUnsavedAnalysis;
+    if (has != _hadUnsavedAnalysis) {
+      _hadUnsavedAnalysis = has;
+      setState(() {});
+    }
+  }
+
+  bool _hadUnsavedAnalysis = false;
 
   CaseAnalysis? get _latestUserAnalysis {
     for (final analysis in _detail.analyses.reversed) {
@@ -123,6 +162,9 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     if (confirmed != true) return;
     try {
       await widget.client.deleteCase(_detail.id);
+      // 兑现「永久删除」承诺：随档案清理未保存的解读草稿，
+      // 避免孤儿文件与隐私残留（空文本 = 删除草稿）。
+      unawaited(saveAnalysisDraft(_detail.id, ''));
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -151,6 +193,8 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
         body: body,
         expectedRevision: _detail.latestAnalysisRevision,
       );
+      // 已保存为正式版本：清除草稿，防止旧草稿覆盖新内容。
+      unawaited(saveAnalysisDraft(_detail.id, ''));
       await _refresh();
       if (mounted) {
         ScaffoldMessenger.of(
@@ -215,6 +259,9 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     final value = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
+      // 下滑关闭走 Navigator.pop（不经 maybePop），会绕过放弃修改
+      // 确认导致输入丢失，编辑类弹层一律禁用下滑关闭。
+      enableDrag: false,
       showDragHandle: true,
       backgroundColor: _paper,
       builder: (sheetContext) => _TextSheetEditor(
@@ -248,6 +295,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     final value = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false, // 编辑弹层禁用下滑关闭，防绕过放弃修改确认
       showDragHandle: true,
       backgroundColor: _paper,
       builder: (sheetContext) => _TextSheetEditor(
@@ -319,6 +367,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     final draft = await showModalBottomSheet<_FeedbackDraft>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false, // 编辑弹层禁用下滑关闭，防绕过放弃修改确认
       showDragHandle: true,
       backgroundColor: _paper,
       builder: (_) => _FeedbackEditor(existing: existing),
@@ -394,6 +443,99 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     );
   }
 
+  /// 放大镜模式（2026-09-05 需求 1）：先选放大倍数，再把 body 当前视口
+  /// 截为位图进入全屏只读查看。图片态与页面按键完全隔离，除返回外
+  /// 无法触发任何交互，排盘渲染不受字体缩放影响。
+  Future<void> _openMagnifierPicker() async {
+    final ratio = await showModalBottomSheet<double>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: _paper,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 4, 24, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '选择放大倍数',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 0, 24, 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '当前界面会截取为图片，可拖动查看各处细节，'
+                  '按返回键退出。',
+                  style: TextStyle(fontSize: 12, color: _mutedInk),
+                ),
+              ),
+            ),
+            for (final (value, label) in const [
+              (1.5, '1.5 倍 · 温和放大'),
+              (2.0, '2.0 倍 · 清晰易读'),
+              (2.5, '2.5 倍 · 最大字号'),
+            ])
+              ListTile(
+                key: Key('magnifier-ratio-$value'),
+                title: Text(label),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).pop(value),
+              ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+    if (ratio == null) return;
+    await _enterMagnifier(ratio);
+  }
+
+  Future<void> _enterMagnifier(double ratio) async {
+    final boundaryContext = _magnifierBoundaryKey.currentContext;
+    if (boundaryContext == null) return;
+    setState(() => _magnifying = true);
+    try {
+      final boundary =
+          boundaryContext.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null || boundary.debugNeedsPaint) {
+        // 首帧未绘制完成时等一帧再截，保证内容完整。
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      if (!mounted) return;
+      final resolved =
+          _magnifierBoundaryKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (resolved == null) return;
+      final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+      final image = await resolved.toImage(pixelRatio: pixelRatio);
+      if (!mounted) {
+        image.dispose();
+        return;
+      }
+      await Navigator.of(context).push(
+        PageRouteBuilder<void>(
+          opaque: true,
+          transitionDuration: const Duration(milliseconds: 220),
+          pageBuilder: (context, animation, secondary) => _MagnifierView(
+            image: image,
+            initialScale: ratio,
+            onDispose: image.dispose,
+          ),
+          transitionsBuilder: (context, animation, secondary, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _magnifying = false);
+    }
+  }
+
   Future<void> _chooseExport() async {
     await _maybePromptExportDefault();
     if (!mounted) return;
@@ -441,6 +583,10 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             includeAnalysis: includeAnalysis,
             includeFeedback: includeFeedback,
             includeAnalysisHistory: includeAnalysisHistory,
+            // 导出字体跟设置页独立选择（2026-09-05 需求）。
+            fontFamily: currentPreferences.exportFontFamily == kExportFontDaoyu
+                ? 'DaoyuSong'
+                : null,
           ),
         );
         final directory = await Directory.systemTemp.createTemp(
@@ -495,254 +641,328 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
 
   @override
   void dispose() {
+    // 离开页面前最后落一次盘（listener 已实时保存，此处兜底）。
+    unawaited(saveAnalysisDraft(_detail.id, _analysisController.text));
+    _analysisController.removeListener(_persistAnalysisDraft);
     _analysisController.dispose();
     super.dispose();
   }
 
+  /// 解读框是否存在未保存变更（PopScope 拦截依据）。
+  bool get _hasUnsavedAnalysis {
+    final text = _analysisController.text.trim();
+    if (text.isEmpty) return false;
+    return text != (_latestUserAnalysis?.body ?? '').trim();
+  }
+
+  /// 返回拦截（2026-09-05 需求）：解读有未保存文字时先问一次，
+  /// 避免误触返回丢内容；草稿无论选哪项都已实时落盘。
+  Future<void> _confirmExitWithUnsavedAnalysis() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('解读尚未保存'),
+        content: const Text('输入的内容还未保存为新版本。草稿已自动保留，下次进入可恢复。'),
+        actions: [
+          TextButton(
+            key: const Key('unsaved-continue'),
+            onPressed: () => Navigator.pop(dialogContext, 'continue'),
+            child: const Text('继续编辑'),
+          ),
+          TextButton(
+            key: const Key('unsaved-exit'),
+            onPressed: () => Navigator.pop(dialogContext, 'exit'),
+            child: const Text('直接退出'),
+          ),
+          FilledButton(
+            key: const Key('unsaved-save-exit'),
+            style: FilledButton.styleFrom(
+              backgroundColor: LiuyaoColors.cinnabar,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, 'save'),
+            child: const Text('保存并退出'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null || choice == 'continue') return;
+    if (choice == 'save') {
+      await _saveAnalysis();
+      // 保存失败（乐观锁冲突等）时留在页面，让用户重试。
+      if (!mounted || _error != null || _hasUnsavedAnalysis) return;
+    }
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 翻转检测基准在每次 build 对齐：任何重建（保存成功后的 _refresh、
+    // 删除历史版本等）都会让 listener 的差值检测恢复有效，避免
+    // canPop 停留在过期值（「保存→继续编辑→返回」序列下拦截静默失效）。
+    _hadUnsavedAnalysis = _hasUnsavedAnalysis;
     final preview = _detail.chart;
     final twelveStages =
         preview.annotations.fiveElementTwelveStages.lineResults;
     final shensha = preview.annotations.shenshaResults;
-    return Scaffold(
-      appBar: AppBar(
-        // 「道谕六爻」品牌标题统一组件（字体与档案页基准一致，AppBar 内字号略缩）。
-        title: const DaoyuBrandTitle(
-          keyOverride: Key('case-result-title'),
-          fontSize: 20,
-        ),
-        actions: [
-          if (widget.openedAfterCasting)
-            const Padding(
-              padding: EdgeInsets.only(right: 2),
-              child: Tooltip(
-                message: '已自动存档',
-                child: Icon(Icons.cloud_done_outlined, color: _cinnabar),
-              ),
-            ),
-          IconButton(
-            key: const Key('case-export'),
-            tooltip: '导出档案',
-            onPressed: _exporting ? null : _chooseExport,
-            icon: _exporting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.ios_share_rounded),
+    // 无未保存变更时正常返回；有变更时拦截并弹保存确认。
+    return PopScope(
+      canPop: !_hasUnsavedAnalysis,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_confirmExitWithUnsavedAnalysis());
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          // 「道谕六爻」品牌标题统一组件（字体与档案页基准一致，AppBar 内字号略缩）。
+          title: const DaoyuBrandTitle(
+            keyOverride: Key('case-result-title'),
+            fontSize: 20,
           ),
-          IconButton(
-            key: const Key('case-delete'),
-            tooltip: '删除档案',
-            onPressed: _confirmDelete,
-            icon: const Icon(Icons.delete_outline_rounded),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: ListView(
-        key: const Key('case-detail-scroll'),
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 40),
-        children: [
-          if (widget.openedAfterCasting) ...[
-            const _AutoArchiveBanner(),
-            const SizedBox(height: 10),
-          ],
-          _QuestionCard(
-            detail: _detail,
-            onEdit: _editQuestionContext,
-            onEditTags: _editTags,
-            onEditQuestion: _editQuestion,
-          ),
-          const SizedBox(height: 10),
-          if (currentPreferences.showCastingRecord &&
-              preview.castingRecord.method == 'three_coins') ...[
-            DSReveal(
-              delay: const Duration(milliseconds: 60),
-              child: _ResultExpansionCard(
-                key: const Key('result-casting-record-section'),
-                title: '起卦记录',
-                summary: '自动铜钱 · 六次原始记录已存档',
-                child: _CastingRecordPanel(record: preview.castingRecord),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          // 2026-09-04 需求：十二长生与神煞卡片移至卦例下方，
-          // 保证截图分享时卦面信息居中、长生与神煞在下方完整可见。
-          DSScaleIn(
-            child: Container(
-              key: const Key('result-chart-card'),
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-              ),
-              child: LiuyaoCoreChart(
-                preview: preview,
-                lightHeader: true,
-                showSummaryHeader: false,
-                growthReference: _growthReference,
-                annotationMode: _annotationMode,
-                onGrowthTap: _openGrowthReferencePicker,
-                visibility: LiuyaoLineAnnotationVisibility(
-                  showNaYin: _showNaYin,
-                  showTwelveGrowth: _showTwelveGrowth,
-                  showFiveStars: _showFiveStars,
-                  show28Mansions: _show28Mansions,
+          actions: [
+            if (widget.openedAfterCasting)
+              const Padding(
+                padding: EdgeInsets.only(right: 2),
+                child: Tooltip(
+                  message: '已自动存档',
+                  child: Icon(Icons.cloud_done_outlined, color: _cinnabar),
                 ),
-                footer: Column(
-                  children: [
-                    LiuyaoLineAnnotationsToggle(
+              ),
+            IconButton(
+              key: const Key('case-magnifier'),
+              tooltip: '放大查看',
+              onPressed: _magnifying ? null : _openMagnifierPicker,
+              icon: const Icon(Icons.zoom_in_map_outlined),
+            ),
+            IconButton(
+              key: const Key('case-export'),
+              tooltip: '导出档案',
+              onPressed: _exporting ? null : _chooseExport,
+              icon: _exporting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.ios_share_rounded),
+            ),
+            IconButton(
+              key: const Key('case-delete'),
+              tooltip: '删除档案',
+              onPressed: _confirmDelete,
+              icon: const Icon(Icons.delete_outline_rounded),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: RepaintBoundary(
+          key: _magnifierBoundaryKey,
+          child: ListView(
+            key: const Key('case-detail-scroll'),
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 40),
+            children: [
+              if (widget.openedAfterCasting) ...[
+                const _AutoArchiveBanner(),
+                const SizedBox(height: 10),
+              ],
+              _QuestionCard(
+                detail: _detail,
+                onEdit: _editQuestionContext,
+                onEditTags: _editTags,
+                onEditQuestion: _editQuestion,
+              ),
+              const SizedBox(height: 10),
+              if (currentPreferences.showCastingRecord &&
+                  preview.castingRecord.method == 'three_coins') ...[
+                DSReveal(
+                  delay: const Duration(milliseconds: 60),
+                  child: _ResultExpansionCard(
+                    key: const Key('result-casting-record-section'),
+                    title: '起卦记录',
+                    summary: '自动铜钱 · 六次原始记录已存档',
+                    child: _CastingRecordPanel(record: preview.castingRecord),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              // 2026-09-04 需求：十二长生与神煞卡片移至卦例下方，
+              // 保证截图分享时卦面信息居中、长生与神煞在下方完整可见。
+              DSScaleIn(
+                child: Container(
+                  key: const Key('result-chart-card'),
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(LiuyaoRadii.card),
+                  ),
+                  child: LiuyaoCoreChart(
+                    preview: preview,
+                    lightHeader: true,
+                    showSummaryHeader: false,
+                    growthReference: _growthReference,
+                    annotationMode: _annotationMode,
+                    onGrowthTap: _openGrowthReferencePicker,
+                    visibility: LiuyaoLineAnnotationVisibility(
                       showNaYin: _showNaYin,
-                      onChangedNaYin: (value) =>
-                          setState(() => _showNaYin = value),
                       showTwelveGrowth: _showTwelveGrowth,
-                      onChangedTwelveGrowth: (value) {
-                        setState(() => _showTwelveGrowth = value);
-                      },
                       showFiveStars: _showFiveStars,
-                      onChangedFiveStars: (value) {
-                        setState(() => _showFiveStars = value);
-                      },
                       show28Mansions: _show28Mansions,
-                      onChanged28Mansions: (value) {
-                        setState(() => _show28Mansions = value);
-                      },
-                      showAlmanacCalendar: _showAlmanacCalendar,
-                      onToggleAlmanacCalendar: () => setState(
-                        () => _showAlmanacCalendar = !_showAlmanacCalendar,
-                      ),
                     ),
-                    if (_showAlmanacCalendar)
-                      LiuyaoMiniAlmanacCalendar(initialMonth: _detail.castAt),
+                    footer: Column(
+                      children: [
+                        LiuyaoLineAnnotationsToggle(
+                          showNaYin: _showNaYin,
+                          onChangedNaYin: (value) =>
+                              setState(() => _showNaYin = value),
+                          showTwelveGrowth: _showTwelveGrowth,
+                          onChangedTwelveGrowth: (value) {
+                            setState(() => _showTwelveGrowth = value);
+                          },
+                          showFiveStars: _showFiveStars,
+                          onChangedFiveStars: (value) {
+                            setState(() => _showFiveStars = value);
+                          },
+                          show28Mansions: _show28Mansions,
+                          onChanged28Mansions: (value) {
+                            setState(() => _show28Mansions = value);
+                          },
+                          showAlmanacCalendar: _showAlmanacCalendar,
+                          onToggleAlmanacCalendar: () => setState(
+                            () => _showAlmanacCalendar = !_showAlmanacCalendar,
+                          ),
+                        ),
+                        if (_showAlmanacCalendar)
+                          LiuyaoMiniAlmanacCalendar(
+                            initialMonth: _detail.castAt,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (twelveStages.isNotEmpty) ...[
+                _ResultExpansionCard(
+                  key: const Key('result-twelve-section'),
+                  title: '十二长生',
+                  summary: _twelveStageSummary(preview.dayPillar),
+                  child: LiuyaoTwelveStagesPanel(
+                    preview: preview,
+                    selectedReference: _growthReference,
+                    onReferenceChanged: (value) {
+                      setState(() => _growthReference = value);
+                    },
+                    annotationMode: _annotationMode,
+                    onModeChanged: (value) {
+                      setState(() => _annotationMode = value);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (shensha.isNotEmpty) ...[
+                _ResultExpansionCard(
+                  key: const Key('result-shensha-section'),
+                  title: '神煞',
+                  summary: _shenshaSummary(shensha),
+                  child: LiuyaoShenshaPanel(preview: preview),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (currentPreferences.showCalculationBasis &&
+                  preview.calculationTrace.isNotEmpty) ...[
+                DSReveal(
+                  delay: const Duration(milliseconds: 120),
+                  child: _ResultExpansionCard(
+                    key: const Key('result-calculation-section'),
+                    title: '计算依据',
+                    summary: '${preview.calculationTrace.length} 组规则过程可核对',
+                    child: LiuyaoCalculationDetailsPanel(preview: preview),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              _ResultExpansionCard(
+                key: const Key('result-analysis-section'),
+                title: '解读信息',
+                summary: _detail.analyses.isEmpty
+                    ? '暂未填写'
+                    : '已保存 ${_detail.analyses.length} 个版本',
+                child: Column(
+                  children: [
+                    _AnalysisEditor(
+                      controller: _analysisController,
+                      saving: _savingAnalysis,
+                      onSave: _saveAnalysis,
+                    ),
+                    if (_detail.analyses.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _AnalysisHistory(
+                        items: _detail.analyses,
+                        onDelete: _confirmDeleteAnalysis,
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (twelveStages.isNotEmpty) ...[
-            _ResultExpansionCard(
-              key: const Key('result-twelve-section'),
-              title: '十二长生',
-              summary: _twelveStageSummary(preview.dayPillar),
-              child: LiuyaoTwelveStagesPanel(
-                preview: preview,
-                selectedReference: _growthReference,
-                onReferenceChanged: (value) {
-                  setState(() => _growthReference = value);
-                },
-                annotationMode: _annotationMode,
-                onModeChanged: (value) {
-                  setState(() => _annotationMode = value);
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          if (shensha.isNotEmpty) ...[
-            _ResultExpansionCard(
-              key: const Key('result-shensha-section'),
-              title: '神煞',
-              summary: _shenshaSummary(shensha),
-              child: LiuyaoShenshaPanel(preview: preview),
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (currentPreferences.showCalculationBasis &&
-              preview.calculationTrace.isNotEmpty) ...[
-            DSReveal(
-              delay: const Duration(milliseconds: 120),
-              child: _ResultExpansionCard(
-                key: const Key('result-calculation-section'),
-                title: '计算依据',
-                summary: '${preview.calculationTrace.length} 组规则过程可核对',
-                child: LiuyaoCalculationDetailsPanel(preview: preview),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          _ResultExpansionCard(
-            key: const Key('result-analysis-section'),
-            title: '解读信息',
-            summary: _detail.analyses.isEmpty
-                ? '暂未填写'
-                : '已保存 ${_detail.analyses.length} 个版本',
-            child: Column(
-              children: [
-                _AnalysisEditor(
-                  controller: _analysisController,
-                  saving: _savingAnalysis,
-                  onSave: _saveAnalysis,
-                ),
-                if (_detail.analyses.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  _AnalysisHistory(
-                    items: _detail.analyses,
-                    onDelete: _confirmDeleteAnalysis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          _ResultExpansionCard(
-            key: const Key('result-feedback-section'),
-            title: '反馈信息',
-            summary: _detail.feedbacks.isEmpty
-                ? '暂未填写'
-                : '已记录 ${_detail.feedbacks.length} 条',
-            child: Column(
-              children: [
-                if (_detail.feedbacks.isEmpty)
-                  _EmptyFeedback(onAdd: () => _editFeedback())
-                else ...[
-                  ..._detail.feedbacks.reversed.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _FeedbackCard(
-                        item: item,
-                        onEdit: () => _editFeedback(item),
+              const SizedBox(height: 8),
+              _ResultExpansionCard(
+                key: const Key('result-feedback-section'),
+                title: '反馈信息',
+                summary: _detail.feedbacks.isEmpty
+                    ? '暂未填写'
+                    : '已记录 ${_detail.feedbacks.length} 条',
+                child: Column(
+                  children: [
+                    if (_detail.feedbacks.isEmpty)
+                      _EmptyFeedback(onAdd: () => _editFeedback())
+                    else ...[
+                      ..._detail.feedbacks.reversed.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _FeedbackCard(
+                            item: item,
+                            onEdit: () => _editFeedback(item),
+                          ),
+                        ),
                       ),
-                    ),
+                      OutlinedButton.icon(
+                        key: const Key('add-feedback'),
+                        onPressed: () => _editFeedback(),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('添加一条反馈'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  '— 仅供娱乐 —',
+                  key: const Key('case-entertainment-note'),
+                  style: const TextStyle(
+                    color: _mutedInk,
+                    fontSize: 12,
+                    letterSpacing: 2,
                   ),
-                  OutlinedButton.icon(
-                    key: const Key('add-feedback'),
-                    onPressed: () => _editFeedback(),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('添加一条反馈'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: DSColors.glowCinnabar,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                ],
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: _cinnabar),
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
-          const SizedBox(height: 20),
-          Center(
-            child: Text(
-              '— 仅供娱乐 —',
-              key: const Key('case-entertainment-note'),
-              style: const TextStyle(
-                color: _mutedInk,
-                fontSize: 12,
-                letterSpacing: 2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (_error != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(13),
-              decoration: BoxDecoration(
-                color: DSColors.glowCinnabar,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(_error!, style: const TextStyle(color: _cinnabar)),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -1007,58 +1227,93 @@ class _TextSheetEditorState extends State<_TextSheetEditor> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      20,
-      8,
-      20,
-      MediaQuery.viewInsetsOf(context).bottom + 24,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.title,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          widget.note,
-          style: const TextStyle(color: _mutedInk, height: 1.4),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          key: widget.editorKey,
-          controller: _controller,
-          autofocus: true,
-          minLines: widget.minLines,
-          maxLines: widget.maxLines,
-          maxLength: widget.maxLength,
-          decoration: InputDecoration(
-            labelText: widget.label,
-            hintText: widget.hint,
-            border: const OutlineInputBorder(),
+  // 2026-09-05 需求：取消/返回前若有未保存修改先确认，防误触丢文字。
+  Future<void> _confirmDiscard() async {
+    if (_controller.text.trim() == widget.initialText.trim() ||
+        context.mounted == false) {
+      Navigator.pop(context);
+      return;
+    }
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('放弃修改？'),
+        content: const Text('已输入的内容尚未保存，关闭后将丢失。'),
+        actions: [
+          TextButton(
+            key: const Key('sheet-discard-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('继续编辑'),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
+          TextButton(
+            key: const Key('sheet-discard-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('放弃修改', style: TextStyle(color: _cinnabar)),
+          ),
+        ],
+      ),
+    );
+    if (discard == true && mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) unawaited(_confirmDiscard());
+    },
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.note,
+            style: const TextStyle(color: _mutedInk, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: widget.editorKey,
+            controller: _controller,
+            autofocus: true,
+            minLines: widget.minLines,
+            maxLines: widget.maxLines,
+            maxLength: widget.maxLength,
+            decoration: InputDecoration(
+              labelText: widget.label,
+              hintText: widget.hint,
+              border: const OutlineInputBorder(),
             ),
-            const SizedBox(width: 8),
-            FilledButton(
-              key: widget.saveKey,
-              onPressed: () => Navigator.pop(context, _controller.text),
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => unawaited(_confirmDiscard()),
+                child: const Text('取消'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                key: widget.saveKey,
+                onPressed: () => Navigator.pop(context, _controller.text),
+                child: const Text('保存'),
+              ),
+            ],
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -1128,7 +1383,7 @@ class _ExportChoice extends StatelessWidget {
   }
 }
 
-class _QuestionCard extends StatelessWidget {
+class _QuestionCard extends StatefulWidget {
   const _QuestionCard({
     required this.detail,
     required this.onEdit,
@@ -1141,6 +1396,11 @@ class _QuestionCard extends StatelessWidget {
   final VoidCallback onEditTags;
   final VoidCallback? onEditQuestion;
 
+  @override
+  State<_QuestionCard> createState() => _QuestionCardState();
+}
+
+class _QuestionCardState extends State<_QuestionCard> {
   @override
   Widget build(BuildContext context) => Container(
     // 与线框图 CaseInfo 对齐：整卡压成两行主信息（日期 / 占问），
@@ -1166,7 +1426,7 @@ class _QuestionCard extends StatelessWidget {
                       text: '日期：',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    TextSpan(text: _dateTime(detail.castAt)),
+                    TextSpan(text: _dateTime(widget.detail.castAt)),
                   ],
                 ),
                 maxLines: 1,
@@ -1175,7 +1435,7 @@ class _QuestionCard extends StatelessWidget {
               ),
             ),
             Text(
-              switch (detail.castingMethod) {
+              switch (widget.detail.castingMethod) {
                 'manual' => '手动起卦',
                 'time_pillar' => '时刻起卦',
                 _ => '自动铜钱',
@@ -1189,7 +1449,7 @@ class _QuestionCard extends StatelessWidget {
             IconButton(
               key: const Key('edit-tags'),
               tooltip: '编辑标签',
-              onPressed: onEditTags,
+              onPressed: widget.onEditTags,
               visualDensity: VisualDensity.compact,
               constraints: const BoxConstraints.tightFor(width: 20, height: 20),
               padding: EdgeInsets.zero,
@@ -1199,7 +1459,7 @@ class _QuestionCard extends StatelessWidget {
             IconButton(
               key: const Key('edit-question-context'),
               tooltip: '编辑背景问念',
-              onPressed: onEdit,
+              onPressed: widget.onEdit,
               visualDensity: VisualDensity.compact,
               constraints: const BoxConstraints.tightFor(width: 20, height: 20),
               padding: EdgeInsets.zero,
@@ -1213,32 +1473,30 @@ class _QuestionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: '占问：',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    TextSpan(text: detail.question),
-                  ],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: _ExpandableText(
+                key: const Key('question-text'),
+                collapsedLines: 3,
                 style: const TextStyle(
                   color: LiuyaoColors.ink,
                   fontSize: 12,
                   height: 1.18,
                   fontWeight: FontWeight.w600,
                 ),
+                children: [
+                  const TextSpan(
+                    text: '占问：',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(text: widget.detail.question),
+                ],
               ),
             ),
-            if (onEditQuestion != null) ...[
+            if (widget.onEditQuestion != null) ...[
               const SizedBox(width: 4),
               IconButton(
                 key: const Key('edit-question'),
                 tooltip: '编辑占问',
-                onPressed: onEditQuestion,
+                onPressed: widget.onEditQuestion,
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints.tightFor(
                   width: 22,
@@ -1254,29 +1512,31 @@ class _QuestionCard extends StatelessWidget {
             ],
           ],
         ),
-        if (detail.questionContext.trim().isNotEmpty ||
-            detail.tags.isNotEmpty) ...[
+        if (widget.detail.questionContext.trim().isNotEmpty ||
+            widget.detail.tags.isNotEmpty) ...[
           const SizedBox(height: 2),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (detail.questionContext.trim().isNotEmpty)
+              if (widget.detail.questionContext.trim().isNotEmpty)
                 Expanded(
-                  child: Text(
-                    '背景问念：${detail.questionContext}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: _ExpandableText(
+                    key: const Key('question-context-text'),
+                    collapsedLines: 2,
                     style: const TextStyle(
                       color: _mutedInk,
                       fontSize: 9,
                       height: 1.15,
                     ),
+                    children: [
+                      TextSpan(text: '背景问念：${widget.detail.questionContext}'),
+                    ],
                   ),
                 )
               else
                 const Spacer(),
-              if (detail.tags.isNotEmpty) ...[
-                if (detail.questionContext.trim().isNotEmpty)
+              if (widget.detail.tags.isNotEmpty) ...[
+                if (widget.detail.questionContext.trim().isNotEmpty)
                   const SizedBox(width: 5),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 128),
@@ -1285,7 +1545,7 @@ class _QuestionCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        for (final tag in detail.tags)
+                        for (final tag in widget.detail.tags)
                           Container(
                             key: Key('detail-tag-$tag'),
                             margin: const EdgeInsets.only(left: 3),
@@ -1327,6 +1587,86 @@ class _QuestionCard extends StatelessWidget {
       '${value.day.toString().padLeft(2, '0')}日 '
       '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}:'
       '${value.second.toString().padLeft(2, '0')}';
+}
+
+/// 可展开的长文本（2026-09-05 需求：占问/背景问念过长时显示不全）。
+/// 默认收起到 [collapsedLines] 行；仅当文本实际溢出时展示「展开/收起」
+/// 入口，点击文本本体或入口按钮切换完整显示，不影响未溢出的排版。
+class _ExpandableText extends StatefulWidget {
+  const _ExpandableText({
+    super.key,
+    required this.children,
+    required this.style,
+    this.collapsedLines = 3,
+  });
+
+  final List<InlineSpan> children;
+  final TextStyle style;
+  final int collapsedLines;
+
+  @override
+  State<_ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<_ExpandableText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final probe = TextPainter(
+          text: TextSpan(style: widget.style, children: widget.children),
+          textDirection: TextDirection.ltr,
+          maxLines: widget.collapsedLines,
+          ellipsis: '…',
+        )..layout(maxWidth: constraints.maxWidth);
+        final overflows = probe.didExceedMaxLines;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 文本本体可点：溢出时点击任意位置切换展开，无需精确点按钮。
+            GestureDetector(
+              behavior: overflows
+                  ? HitTestBehavior.opaque
+                  : HitTestBehavior.deferToChild,
+              onTap: overflows
+                  ? () => setState(() => _expanded = !_expanded)
+                  : null,
+              child: Text.rich(
+                TextSpan(style: widget.style, children: widget.children),
+                maxLines: _expanded ? null : widget.collapsedLines,
+                overflow: _expanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+              ),
+            ),
+            if (overflows)
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Text(
+                    _expanded ? '收起 ▴' : '展开全部 ▾',
+                    key: Key(_expanded ? 'collapse-toggle' : 'expand-toggle'),
+                    style: TextStyle(
+                      color: _cinnabar,
+                      fontSize: widget.style.fontSize != null
+                          ? (widget.style.fontSize! - 2).clamp(8, 12)
+                          : 10,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _AutoArchiveBanner extends StatelessWidget {
@@ -1727,6 +2067,9 @@ class _FeedbackEditorState extends State<_FeedbackEditor> {
   late final TextEditingController _controller;
   late String _status;
   late DateTime _date;
+  // 打开编辑器时的初始快照：判断「是否有改动」的基准（2026-09-05 需求）。
+  late final String _initialStatus;
+  late final DateTime _initialDate;
   String? _error;
 
   @override
@@ -1735,6 +2078,8 @@ class _FeedbackEditorState extends State<_FeedbackEditor> {
     _controller = TextEditingController(text: widget.existing?.body ?? '');
     _status = widget.existing?.status ?? 'pending';
     _date = widget.existing?.occurredAt ?? DateTime.now();
+    _initialStatus = _status;
+    _initialDate = _date;
   }
 
   Future<void> _pickDate() async {
@@ -1745,6 +2090,40 @@ class _FeedbackEditorState extends State<_FeedbackEditor> {
       lastDate: DateTime(2100),
     );
     if (value != null && mounted) setState(() => _date = value);
+  }
+
+  // 2026-09-05 需求：反馈编辑中误触返回/barrier 关闭前先确认，
+  // 内容、状态或日期有改动时提示，防丢文字。
+  bool get _hasChanges =>
+      _controller.text.trim() != (widget.existing?.body ?? '').trim() ||
+      _status != _initialStatus ||
+      _date != _initialDate;
+
+  Future<void> _confirmDiscard() async {
+    if (!_hasChanges) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('放弃反馈修改？'),
+        content: const Text('已填写的内容尚未保存，关闭后将丢失。'),
+        actions: [
+          TextButton(
+            key: const Key('feedback-discard-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('继续编辑'),
+          ),
+          TextButton(
+            key: const Key('feedback-discard-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('放弃修改', style: TextStyle(color: _cinnabar)),
+          ),
+        ],
+      ),
+    );
+    if (discard == true && mounted) Navigator.pop(context);
   }
 
   void _submit() {
@@ -1766,75 +2145,83 @@ class _FeedbackEditorState extends State<_FeedbackEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      20,
-      4,
-      20,
-      MediaQuery.viewInsetsOf(context).bottom + 24,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.existing == null ? '添加反馈' : '编辑反馈',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 14),
-        DropdownButtonFormField<String>(
-          key: const Key('feedback-status'),
-          initialValue: _status,
-          decoration: const InputDecoration(
-            labelText: '验证状态',
-            border: OutlineInputBorder(),
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) unawaited(_confirmDiscard());
+    },
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.existing == null ? '添加反馈' : '编辑反馈',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
           ),
-          items: const ['pending', 'matched', 'partial', 'not_matched']
-              .map(
-                (value) => DropdownMenuItem(
-                  value: value,
-                  child: Text(_statusLabel(value)),
-                ),
-              )
-              .toList(growable: false),
-          onChanged: (value) => setState(() => _status = value ?? _status),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _pickDate,
-          icon: const Icon(Icons.calendar_today_outlined),
-          label: Text(
-            '发生日期 ${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            key: const Key('feedback-status'),
+            initialValue: _status,
+            decoration: const InputDecoration(
+              labelText: '验证状态',
+              border: OutlineInputBorder(),
+            ),
+            items: const ['pending', 'matched', 'partial', 'not_matched']
+                .map(
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(_statusLabel(value)),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (value) => setState(() => _status = value ?? _status),
           ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          key: const Key('feedback-body'),
-          controller: _controller,
-          autofocus: true,
-          minLines: 4,
-          maxLines: 8,
-          maxLength: 20000,
-          decoration: const InputDecoration(
-            labelText: '反馈内容',
-            hintText: '记录实际发生了什么，以及与原解读是否对应',
-            border: OutlineInputBorder(),
-            counterText: '',
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _pickDate,
+            icon: const Icon(Icons.calendar_today_outlined),
+            label: Text(
+              '发生日期 ${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+            ),
           ),
-        ),
-        if (_error != null) ...[
-          const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: _cinnabar)),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('feedback-body'),
+            controller: _controller,
+            autofocus: true,
+            minLines: 4,
+            maxLines: 8,
+            maxLength: 20000,
+            decoration: const InputDecoration(
+              labelText: '反馈内容',
+              hintText: '记录实际发生了什么，以及与原解读是否对应',
+              border: OutlineInputBorder(),
+              counterText: '',
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: _cinnabar)),
+          ],
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            key: const Key('save-feedback'),
+            onPressed: _submit,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+            ),
+            icon: const Icon(Icons.save_outlined),
+            label: Text(widget.existing == null ? '保存反馈' : '保存修改'),
+          ),
         ],
-        const SizedBox(height: 14),
-        FilledButton.icon(
-          key: const Key('save-feedback'),
-          onPressed: _submit,
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-          icon: const Icon(Icons.save_outlined),
-          label: Text(widget.existing == null ? '保存反馈' : '保存修改'),
-        ),
-      ],
+      ),
     ),
   );
 }
@@ -2046,6 +2433,128 @@ class _TagsEditorState extends State<_TagsEditor> {
                 child: const Text('保存'),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 放大镜全屏查看页（2026-09-05 需求 1）：以位图方式呈现详情页当前视口，
+/// InteractiveViewer 只读缩放/拖动。图片态下页面所有按钮均不可触达，
+/// 仅顶栏关闭按钮与系统返回键可退出——放大能力与排盘布局彻底解耦。
+class _MagnifierView extends StatefulWidget {
+  const _MagnifierView({
+    required this.image,
+    required this.initialScale,
+    this.onDispose,
+  });
+
+  final ui.Image image;
+  final double initialScale;
+  final VoidCallback? onDispose;
+
+  @override
+  State<_MagnifierView> createState() => _MagnifierViewState();
+}
+
+class _MagnifierViewState extends State<_MagnifierView> {
+  late final TransformationController _controller;
+  late double _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _scale = widget.initialScale;
+    _controller = TransformationController(
+      Matrix4.diagonal3Values(widget.initialScale, widget.initialScale, 1),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    widget.onDispose?.call();
+    super.dispose();
+  }
+
+  void _applyScale(double value) {
+    setState(() => _scale = value);
+    _controller.value = Matrix4.diagonal3Values(value, value, 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          InteractiveViewer(
+            transformationController: _controller,
+            minScale: 1.0,
+            maxScale: 4.0,
+            panEnabled: true,
+            boundaryMargin: const EdgeInsets.all(double.infinity),
+            child: SizedBox.expand(
+              child: RawImage(image: widget.image, fit: BoxFit.contain),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 10, 0),
+              child: Row(
+                children: [
+                  IconButton.filledTonal(
+                    key: const Key('magnifier-close'),
+                    tooltip: '退出放大',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black54,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                  const Spacer(),
+                  for (final (value, label) in const [
+                    (1.5, '1.5×'),
+                    (2.0, '2×'),
+                    (2.5, '2.5×'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: GestureDetector(
+                        onTap: () => _applyScale(value),
+                        child: Container(
+                          key: Key('magnifier-chip-$value'),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _scale == value ? _cinnabar : Colors.black54,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: _scale == value
+                                  ? _cinnabar
+                                  : Colors.white24,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              color: _scale == value
+                                  ? Colors.white
+                                  : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

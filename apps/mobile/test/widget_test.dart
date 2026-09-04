@@ -13,6 +13,7 @@ import 'package:liuyao_archive/src/features/archive/archive_image_export.dart';
 import 'package:liuyao_archive/src/features/archive/archive_models.dart';
 import 'package:liuyao_archive/src/features/archive/archive_page.dart';
 import 'package:liuyao_archive/src/features/archive/case_detail_page.dart';
+import 'package:liuyao_archive/src/features/archive/draft_store.dart';
 import 'package:liuyao_archive/src/features/casting/casting_client.dart';
 import 'package:liuyao_archive/src/features/casting/casting_models.dart';
 import 'package:liuyao_archive/src/features/casting/chart_preview.dart';
@@ -34,6 +35,9 @@ void main() {
   setUp(() {
     preferencesDirectoryOverride = () async => _prefsTempDir;
     resetPreferencesCacheForTest();
+    // 2026-09-05：解读草稿写入临时目录，测试互不串扰。
+    resetDraftCacheForTest();
+    draftDirectoryOverride = () async => _prefsTempDir;
     // 2026-09-04：导出首启「历史版本默认值」选择默认视为已完成，
     // 避免既有导出测试被一次性弹窗拦截；首启行为由专项测试覆盖
     // （自行改写该偏好）。savePreferences 首行同步更新内存缓存，
@@ -44,6 +48,8 @@ void main() {
   tearDownAll(() async {
     preferencesDirectoryOverride = null;
     resetPreferencesCacheForTest();
+    draftDirectoryOverride = null;
+    resetDraftCacheForTest();
     await _prefsTempDir.delete(recursive: true);
   });
 
@@ -747,6 +753,13 @@ void main() {
     await tester.tap(find.text('设置'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-title')), findsOneWidget);
+    // 2026-09-05 新增「字体」分区后页面变长，「本地数据」卡需滚动进入
+    // 视口才被 ListView 构建（懒构建语义）。
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings-local-data-card')),
+      240,
+    );
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-local-data-card')), findsOneWidget);
     expect(find.text('档案保存在本机'), findsOneWidget);
     // 2026-09-01 需求：设计系统预览入口移除，改为作者其他产品入口。
@@ -2143,6 +2156,235 @@ void main() {
     expect(find.byKey(const Key('export-setup-dialog')), findsNothing);
     expect(find.byKey(const Key('export-sheet')), findsOneWidget);
   });
+
+  testWidgets('detail page expands long question and context text', (
+    tester,
+  ) async {
+    // 2026-09-05 需求：占问/背景问念过长时不再省略号截断——
+    // 默认收起到 3/2 行，溢出时出现「展开全部」入口，点击后完整显示。
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final longQuestion =
+        '这是一个非常长的占问文本，'
+        '起卦人反复补充了大量细节与背景说明，远远超过默认三行的展示范围，'
+        '需要展开入口才能读到全部内容，避免被省略号截断看不到后半段。'
+        '后面还在继续补充：求测时间在深秋，涉及的人物有三位，'
+        '事情横跨两个城市，时间线长达数月，求测人自己也不确定'
+        '该用哪一个时间点来起卦，于是把所有犹豫都写进了占问里，'
+        '导致这一段文字远超普通问句的长度，必须完整展示。';
+    final longContext =
+        '背景问念同样写得很长，'
+        '记录了求测人的处境、时间线与顾虑，超过两行折叠线，'
+        '同样需要可展开，确保详情页与导出内容一致可见。'
+        '这里继续追加第二段：求测人在早春有过一次类似的占问，'
+        '当时的结论与眼下处境有出入，因此这次把来龙去脉全部写下，'
+        '作为背景问念留给日后复盘对照使用，不做省略。';
+    final archive = _FakeArchiveDataSource();
+    archive.detail = _FakeArchiveDataSource._detailFrom(
+      question: longQuestion,
+      questionContext: longContext,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 占问与背景问念都溢出：各出现一个展开入口（占问在前）。
+    expect(find.byKey(const Key('expand-toggle')), findsNWidgets(2));
+    await tester.tap(find.byKey(const Key('expand-toggle')).first);
+    await tester.pumpAndSettle();
+    // 展开后切换为「收起」，且正文 Text 不再有行数约束（完整显示）。
+    expect(find.byKey(const Key('collapse-toggle')), findsOneWidget);
+    Text innerText(Key key) => tester.widget<Text>(
+      find.descendant(of: find.byKey(key), matching: find.byType(Text)).first,
+    );
+    expect(innerText(const Key('question-text')).maxLines, isNull);
+
+    await tester.ensureVisible(find.byKey(const Key('question-context-text')));
+    await tester.pumpAndSettle();
+    // 问念仍处收起态：maxLines=2，展开入口可用。
+    expect(innerText(const Key('question-context-text')).maxLines, 2);
+  });
+
+  testWidgets('magnifier captures viewport and exits via close', (
+    tester,
+  ) async {
+    // 2026-09-05 需求：放大镜模式——AppBar 入口选倍数后，界面截为
+    // 位图进入全屏只读查看；顶栏关闭退出，页面按钮不可触达。
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('case-magnifier')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('magnifier-ratio-2.0')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('magnifier-ratio-2.0')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('magnifier-close')), findsOneWidget);
+    expect(find.byKey(const Key('magnifier-chip-2.5')), findsOneWidget);
+    // 查看态下底层页面按钮已被全屏路由遮盖（仍在树上但不可交互），
+    // 关闭后恢复。
+    await tester.tap(find.byKey(const Key('magnifier-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('magnifier-close')), findsNothing);
+    expect(find.byKey(const Key('case-detail-scroll')), findsOneWidget);
+  });
+
+  testWidgets('settings font choices persist and notify ui font', (
+    tester,
+  ) async {
+    // 2026-09-05 需求：设置页「字体」分区——产品内字体切换即时通知，
+    // 导出字体写入偏好；默认值 system/daoyu 与现状一致。
+    await tester.pumpWidget(const LiuyaoArchiveApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings-font-card')),
+      240,
+    );
+    await tester.pumpAndSettle();
+    expect(currentPreferences.uiFontFamily, kUiFontSystem);
+    expect(currentPreferences.exportFontFamily, kExportFontDaoyu);
+
+    await tester.tap(find.text('道谕宋').first);
+    await tester.pumpAndSettle();
+    expect(currentPreferences.uiFontFamily, 'daoyu');
+    expect(uiFontFamilyNotifier.value, 'daoyu');
+
+    await tester.tap(find.text('系统默认').last);
+    await tester.pumpAndSettle();
+    expect(currentPreferences.exportFontFamily, 'system');
+    expect(currentPreferences.uiFontFamily, 'daoyu');
+  });
+
+  testWidgets('unsaved analysis blocks exit until user chooses', (
+    tester,
+  ) async {
+    // 2026-09-05 需求：解读输入一半误触返回不再直接丢——先弹确认，
+    // 「继续编辑」留在页面，「直接退出」放行（草稿已由 listener 落盘）。
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // 解读区是折叠卡且在懒构建列表下方：先滚动到位再展开输入。
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('result-analysis-section')),
+      240,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('result-analysis-section')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('analysis-editor')),
+      '写到一半的解读内容',
+    );
+    await tester.pumpAndSettle();
+
+    // 根路由无 AppBar 返回按钮：用系统返回（handlePopRoute）触发拦截。
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    // 拦截生效：确认框出现，页面仍在。
+    expect(find.byKey(const Key('unsaved-exit')), findsOneWidget);
+    expect(find.byKey(const Key('case-detail-scroll')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('unsaved-continue')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('case-detail-scroll')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('unsaved-exit')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('case-detail-scroll')), findsNothing);
+  });
+
+  testWidgets('saving analysis re-arms exit guard for subsequent edits', (
+    tester,
+  ) async {
+    // 独立审查修复回归：保存成功 → _refresh 重建后，翻转检测基准若
+    // 不同步，「继续输入 → 返回」序列下 canPop 停留在 true，拦截静默失效。
+    await tester.binding.setSurfaceSize(const Size(430, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('result-analysis-section')),
+      240,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('result-analysis-section')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('analysis-editor')), '第一版解读');
+    await tester.pumpAndSettle();
+    // 保存按钮可能仍在视口外：滚动到位再点（ensureVisible 走元素自身
+    // 滚动链——输入框展开后树上有多个 Scrollable，自动探测会失败）。
+    final saveButton = find.byKey(const Key('save-analysis')).last;
+    await tester.ensureVisible(saveButton);
+    await tester.pumpAndSettle();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    expect(find.text('解读已保存为新版本'), findsOneWidget);
+
+    // 保存后再输入新文字：返回拦截必须重新武装（修复前 canPop 停留 true）。
+    await tester.enterText(
+      find.byKey(const Key('analysis-editor')),
+      '第一版解读，再补充两句',
+    );
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('unsaved-exit')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('unsaved-continue')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('case-detail-scroll')), findsOneWidget);
+  });
+
+  testWidgets('question editor ignores drag-down instead of discarding text', (
+    tester,
+  ) async {
+    // 独立审查修复回归：bottom sheet 下滑关闭走 Navigator.pop（不经
+    // maybePop），PopScope 拦不住——编辑类弹层 enableDrag:false，
+    // 下滑不再关闭，未保存文本不丢失。
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('edit-question')),
+      240,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('edit-question')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('question-editor')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('question-editor')), '改到一半的占问');
+    await tester.pumpAndSettle();
+
+    // 下滑手势：弹层保持打开，文本仍在（修复前直接关闭且无确认）。
+    await tester.drag(find.text('编辑占问'), const Offset(0, 400));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('question-editor')), findsOneWidget);
+    expect(find.text('改到一半的占问'), findsOneWidget);
+  });
 }
 
 class _FakeAlmanacDataSource implements AlmanacDataSource {
@@ -2430,12 +2672,16 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
     return currentMax > _revisionCeiling ? currentMax : _revisionCeiling;
   }
 
-  static CaseDetail _detailFrom({String question = '此事后续如何？'}) {
+  static CaseDetail _detailFrom({
+    String question = '此事后续如何？',
+    String questionContext = '',
+  }) {
     final now = DateTime(2026, 8, 5, 15, 26);
     return CaseDetail.fromJson({
       'id': 'case-1',
       'title': '测试档案',
       'question': question,
+      'questionContext': questionContext,
       'castAt': now.toIso8601String(),
       'castingMethod': 'manual',
       'baseHexagram': '泽天夬',

@@ -78,6 +78,16 @@ class _SettingsPageState extends State<SettingsPage> {
     await savePreferences(next);
   }
 
+  /// 字体选择（2026-09-05 需求）：'ui'=产品内字体（经全局 notifier 即时
+  /// 重建主题），'export'=导出字体（每次导出时读取）。
+  Future<void> _setFont(String scope, String value) async {
+    final next = scope == 'ui'
+        ? _prefs.copyWith(uiFontFamily: value)
+        : _prefs.copyWith(exportFontFamily: value);
+    setState(() => _prefs = next);
+    await savePreferences(next);
+  }
+
   @override
   Widget build(BuildContext context) {
     final dayLabel =
@@ -312,6 +322,51 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 22),
           DSReveal(
             delay: const Duration(milliseconds: 180),
+            child: const _SectionLabel('字体'),
+          ),
+          const SizedBox(height: 10),
+          DSReveal(
+            delay: const Duration(milliseconds: 210),
+            child: DSGlassPanel(
+              key: const Key('settings-font-card'),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: DSColors.glass,
+              child: Column(
+                children: [
+                  // 2026-09-05 需求：产品内与导出字体分别选择。卦面排盘
+                  // 组件显式锁定道谕宋，界面字体切换不影响排盘排版。
+                  _FontChoiceRow(
+                    key: const Key('settings-ui-font'),
+                    icon: Icons.text_fields_outlined,
+                    title: '产品内字体',
+                    description: '界面文字字体，切换后立即生效；卦面排盘固定道谕宋不受影响',
+                    value: _prefs.uiFontFamily,
+                    options: const [(kUiFontSystem, '系统默认'), ('daoyu', '道谕宋')],
+                    onChanged: (value) => _setFont('ui', value),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: DSColors.hairline.withValues(alpha: .6),
+                  ),
+                  _FontChoiceRow(
+                    key: const Key('settings-export-font'),
+                    icon: Icons.image_outlined,
+                    title: '导出字体',
+                    description: '长图导出使用的字体；行高按所选字体实测自适应',
+                    value: _prefs.exportFontFamily,
+                    options: const [
+                      (kExportFontDaoyu, '道谕宋'),
+                      ('system', '系统默认'),
+                    ],
+                    onChanged: (value) => _setFont('export', value),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          DSReveal(
+            delay: const Duration(milliseconds: 240),
             child: const _SectionLabel('本地数据'),
           ),
           const SizedBox(height: 10),
@@ -629,6 +684,80 @@ class _SettingsRow extends StatelessWidget {
                     color: DSColors.textMuted,
                     fontSize: 11.5,
                     height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 字体选择行（2026-09-05 需求）：图标 + 标题描述 + 分段选择按钮。
+class _FontChoiceRow extends StatelessWidget {
+  const _FontChoiceRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final String value;
+  final List<(String, String)> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20, color: DSColors.celadonDeep),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: DSColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: DSColors.textMuted,
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                SegmentedButton<String>(
+                  key: Key('font-choice-$title'),
+                  segments: [
+                    for (final (optionValue, label) in options)
+                      ButtonSegment(value: optionValue, label: Text(label)),
+                  ],
+                  selected: {value},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (selection) => onChanged(selection.first),
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: WidgetStatePropertyAll(
+                      TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
               ],
