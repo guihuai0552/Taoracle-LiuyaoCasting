@@ -27,11 +27,27 @@ const _lineRowHeight = 140.0;
 const _chartCardHeight =
     _chartPillarZone + _chartHeaderZone + 6 * _lineRowHeight;
 
+/// 长图导出的内容选项（2026-09-04 需求）：
+/// - [includeAnalysis]/[includeFeedback] 关闭时整个区块不绘制（只分享卦本身）；
+/// - [includeAnalysisHistory] 为 false 时解读区只画最新一个版本。
+class ArchiveImageOptions {
+  const ArchiveImageOptions({
+    this.includeAnalysis = true,
+    this.includeFeedback = true,
+    this.includeAnalysisHistory = true,
+  });
+
+  final bool includeAnalysis;
+  final bool includeFeedback;
+  final bool includeAnalysisHistory;
+}
+
 Future<Uint8List> buildCaseArchivePng(
   BuildContext context,
-  CaseDetail detail,
-) async {
-  final layout = _ArchiveImageLayout(detail);
+  CaseDetail detail, {
+  ArchiveImageOptions options = const ArchiveImageOptions(),
+}) async {
+  final layout = _ArchiveImageLayout(detail, options);
   final height = layout.measure();
   if (height > 30000) {
     throw const FormatException('解读与反馈内容过长，无法生成单张图片；请改用 Markdown 导出');
@@ -49,33 +65,46 @@ Future<Uint8List> buildCaseArchivePng(
 }
 
 class _ArchiveImageLayout {
-  _ArchiveImageLayout(this.detail);
+  _ArchiveImageLayout(this.detail, this.options);
 
   final CaseDetail detail;
+  final ArchiveImageOptions options;
   final List<_MeasuredBlock> _analysisBlocks = [];
   final List<_MeasuredBlock> _feedbackBlocks = [];
 
   double measure() {
     _analysisBlocks.clear();
     _feedbackBlocks.clear();
-    for (final analysis in detail.analyses) {
-      _analysisBlocks.add(
-        _MeasuredBlock(
-          heading: '版本 ${analysis.revision} · ${_dateTime(analysis.createdAt)}',
-          body: analysis.body,
-          badge: false,
-        )..measure(_imageContentWidth - 56),
-      );
+    // includeAnalysisHistory=false 时只保留追加列表最后一项（最新版本；
+    // 中间被删除的版本留洞不影响「最后一项=最新」）。
+    final visibleAnalyses = options.includeAnalysisHistory
+        ? detail.analyses
+        : detail.analyses.isEmpty
+        ? detail.analyses
+        : detail.analyses.sublist(detail.analyses.length - 1);
+    if (options.includeAnalysis) {
+      for (final analysis in visibleAnalyses) {
+        _analysisBlocks.add(
+          _MeasuredBlock(
+            heading:
+                '版本 ${analysis.revision} · ${_dateTime(analysis.createdAt)}',
+            body: analysis.body,
+            badge: false,
+          )..measure(_imageContentWidth - 56),
+        );
+      }
     }
-    for (final feedback in detail.feedbacks) {
-      _feedbackBlocks.add(
-        _MeasuredBlock(
-          heading:
-              '${_feedbackStatus(feedback.status)} · ${_dateTime(feedback.occurredAt ?? feedback.createdAt)}',
-          body: feedback.body,
-          badge: true,
-        )..measure(_imageContentWidth - 56),
-      );
+    if (options.includeFeedback) {
+      for (final feedback in detail.feedbacks) {
+        _feedbackBlocks.add(
+          _MeasuredBlock(
+            heading:
+                '${_feedbackStatus(feedback.status)} · ${_dateTime(feedback.occurredAt ?? feedback.createdAt)}',
+            body: feedback.body,
+            badge: true,
+          )..measure(_imageContentWidth - 56),
+        );
+      }
     }
     final analysesHeight = _sectionBodyHeight(_analysisBlocks);
     final feedbackHeight = _sectionBodyHeight(_feedbackBlocks);
@@ -87,12 +116,8 @@ class _ArchiveImageLayout {
         _infoCardHeight +
         28 +
         _chartCardHeight +
-        34 +
-        64 +
-        analysesHeight +
-        34 +
-        64 +
-        feedbackHeight +
+        (options.includeAnalysis ? 34 + 64 + analysesHeight : 0) +
+        (options.includeFeedback ? 34 + 64 + feedbackHeight : 0) +
         96;
   }
 
@@ -133,10 +158,14 @@ class _ArchiveImageLayout {
     );
     y += _infoCardHeight + 28;
     y = _paintChart(canvas, y);
-    y += 34;
-    y = _paintRecordSection(canvas, y, '解读信息', _analysisBlocks, '尚未填写解读');
-    y += 34;
-    y = _paintRecordSection(canvas, y, '反馈信息', _feedbackBlocks, '尚未填写反馈');
+    if (options.includeAnalysis) {
+      y += 34;
+      y = _paintRecordSection(canvas, y, '解读信息', _analysisBlocks, '尚未填写解读');
+    }
+    if (options.includeFeedback) {
+      y += 34;
+      y = _paintRecordSection(canvas, y, '反馈信息', _feedbackBlocks, '尚未填写反馈');
+    }
     _text(
       canvas,
       '— 卦面与记录来自本机档案 · 仅供整理与复盘 —',
@@ -341,11 +370,7 @@ class _ArchiveImageLayout {
       ganZhi: hidden?.najia.ganZhi ?? '',
       annotationLines: hidden == null
           ? const []
-          : _layerAnnotationLines(
-              'hidden',
-              line.position,
-              hidden.najia.nayin,
-            ),
+          : _layerAnnotationLines('hidden', line.position, hidden.najia.nayin),
       offset: Offset(_imageMargin + 142, y + 26),
       width: 164,
     );
@@ -526,14 +551,7 @@ class _ArchiveImageLayout {
         maxLines: 1,
       );
     } else {
-      _ganZhiText(
-        canvas,
-        relation,
-        ganZhi,
-        offset,
-        size: 36,
-        maxWidth: width,
-      );
+      _ganZhiText(canvas, relation, ganZhi, offset, size: 36, maxWidth: width);
     }
     var lineY = offset.dy + 46;
     for (final line in annotationLines) {
@@ -817,7 +835,10 @@ void _segmentsText(
   for (var index = 0; index < segments.length; index++) {
     if (index > 0) {
       spans.add(
-        TextSpan(text: '·', style: base.copyWith(color: LiuyaoColors.inkMuted)),
+        TextSpan(
+          text: '·',
+          style: base.copyWith(color: LiuyaoColors.inkMuted),
+        ),
       );
     }
     final seg = segments[index];
@@ -907,22 +928,33 @@ TextPainter _ganZhiPainter(
   );
   final spans = <TextSpan>[];
   if (relation.isNotEmpty) {
-    spans.add(TextSpan(text: relation, style: base.copyWith(color: LiuyaoColors.ink)));
+    spans.add(
+      TextSpan(
+        text: relation,
+        style: base.copyWith(color: LiuyaoColors.ink),
+      ),
+    );
   }
   if (ganZhi.length >= 2) {
-    spans.add(TextSpan(
-      text: ganZhi.substring(0, 1),
-      style: base.copyWith(color: _ganZhiColor(ganZhi.substring(0, 1))),
-    ));
-    spans.add(TextSpan(
-      text: ganZhi.substring(1),
-      style: base.copyWith(color: _branchColor(ganZhi.substring(1, 2))),
-    ));
+    spans.add(
+      TextSpan(
+        text: ganZhi.substring(0, 1),
+        style: base.copyWith(color: _ganZhiColor(ganZhi.substring(0, 1))),
+      ),
+    );
+    spans.add(
+      TextSpan(
+        text: ganZhi.substring(1),
+        style: base.copyWith(color: _branchColor(ganZhi.substring(1, 2))),
+      ),
+    );
   } else if (ganZhi.isNotEmpty) {
-    spans.add(TextSpan(
-      text: ganZhi,
-      style: base.copyWith(color: _ganZhiColor(ganZhi)),
-    ));
+    spans.add(
+      TextSpan(
+        text: ganZhi,
+        style: base.copyWith(color: _ganZhiColor(ganZhi)),
+      ),
+    );
   }
   final painter = TextPainter(
     text: TextSpan(children: spans),

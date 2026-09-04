@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -101,9 +102,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('删除这份档案？'),
-        content: Text(
-          '「${_detail.title}」及其卦面、解读与反馈将被永久删除，且无法恢复。',
-        ),
+        content: Text('「${_detail.title}」及其卦面、解读与反馈将被永久删除，且无法恢复。'),
         actions: [
           TextButton(
             key: const Key('case-delete-cancel'),
@@ -126,16 +125,16 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       await widget.client.deleteCase(_detail.id);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败：$error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('删除失败：$error')));
       }
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('档案已删除')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('档案已删除')));
     Navigator.pop(context);
   }
 
@@ -165,68 +164,105 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     }
   }
 
-  Future<void> _editQuestionContext() async {
-    final controller = TextEditingController(text: _detail.questionContext);
+  Future<void> _confirmDeleteAnalysis(CaseAnalysis item) async {
+    // 2026-09-04 需求：历史解读版本可删除（写得不好或有误的版本不必保留）。
+    // 按档案删除惯例做二次确认（FR-CAS-008）。
+    final preview = item.body.length > 40
+        ? '${item.body.substring(0, 40)}…'
+        : item.body;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除这个解读版本？'),
+        content: Text(
+          '将删除「版本 ${item.revision} · $preview」。\n'
+          '删除后不可恢复；其余版本与反馈不受影响。',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('delete-analysis-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('再想想'),
+          ),
+          TextButton(
+            key: const Key('delete-analysis-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('删除', style: TextStyle(color: _cinnabar)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.client.deleteAnalysis(
+        caseId: _detail.id,
+        analysisId: item.id,
+      );
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('该解读版本已删除')));
+      }
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = _message(error));
+    }
+  }
+
+  Future<void> _editQuestion() async {
+    // 2026-09-04 需求：占问文本本身可修改（起卦时输入的内容写错可纠正），
+    // 背景问念仍作为独立补充入口保留。修改不触碰卦面与起卦记录。
     final value = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: _paper,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          8,
-          20,
-          MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '编辑背景问念',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '可在起卦后补充背景，不会修改原卦、四柱或起卦时间。',
-              style: TextStyle(color: _mutedInk, height: 1.4),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('question-context-editor'),
-              controller: controller,
-              autofocus: true,
-              minLines: 4,
-              maxLines: 10,
-              maxLength: 10000,
-              decoration: const InputDecoration(
-                labelText: '背景问念',
-                hintText: '补充问题背景、已知条件和真正想确认的事情',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  child: const Text('取消'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  key: const Key('save-question-context'),
-                  onPressed: () => Navigator.pop(sheetContext, controller.text),
-                  child: const Text('保存'),
-                ),
-              ],
-            ),
-          ],
-        ),
+      builder: (sheetContext) => _TextSheetEditor(
+        title: '编辑占问',
+        note: '修改占问内容不会改动卦面、四柱与起卦时间；更详细的补充请用「编辑背景问念」。',
+        label: '占问事项',
+        hint: '这次想问什么',
+        initialText: _detail.question == '暂无问念' ? '' : _detail.question,
+        minLines: 2,
+        maxLines: 6,
+        maxLength: 1000,
+        editorKey: const Key('question-editor'),
+        saveKey: const Key('save-question'),
       ),
     );
-    controller.dispose();
+    if (value == null || !mounted) return;
+    try {
+      await widget.client.updateQuestion(caseId: _detail.id, question: value);
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('占问已保存')));
+      }
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = _message(error));
+    }
+  }
+
+  Future<void> _editQuestionContext() async {
+    final value = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: _paper,
+      builder: (sheetContext) => _TextSheetEditor(
+        title: '编辑背景问念',
+        note: '可在起卦后补充背景，不会修改原卦、四柱或起卦时间。',
+        label: '背景问念',
+        hint: '补充问题背景、已知条件和真正想确认的事情',
+        initialText: _detail.questionContext,
+        minLines: 4,
+        maxLines: 10,
+        maxLength: 10000,
+        editorKey: const Key('question-context-editor'),
+        saveKey: const Key('save-question-context'),
+      ),
+    );
     if (value == null || !mounted) return;
     try {
       await widget.client.updateQuestionContext(
@@ -253,8 +289,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       suggestions = {
         ...suggestions,
         for (final item in summaries) ...item.tags,
-      }.toList()
-        ..sort((a, b) => a.compareTo(b));
+      }.toList()..sort((a, b) => a.compareTo(b));
     } on Object {
       // 聚合失败仅意味着没有建议，不影响编辑。
     }
@@ -264,10 +299,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: _paper,
-      builder: (_) => _TagsEditor(
-        initialTags: tags,
-        suggestions: suggestions,
-      ),
+      builder: (_) => _TagsEditor(initialTags: tags, suggestions: suggestions),
     );
     if (result == null || !mounted) return;
     try {
@@ -320,8 +352,52 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     }
   }
 
+  /// 首次导出前让用户选择「解读历史版本」的默认导出口径（2026-09-04
+  /// 需求 1）；之后可在设置中修改，导出面板上也随时可切。
+  Future<void> _maybePromptExportDefault() async {
+    if (currentPreferences.exportSetupCompleted) return;
+    final includeHistory = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('export-setup-dialog'),
+        title: const Text('导出解读时默认包含历史版本吗？'),
+        content: const Text(
+          '解读会随每次保存追加新版本。你可以选择导出时默认带上全部历史版本，'
+          '或只导出最新一版；每次导出时也可临时切换。',
+          style: TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('export-setup-latest'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('仅最新版本'),
+          ),
+          FilledButton(
+            key: const Key('export-setup-history'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('包含全部历史版本'),
+          ),
+        ],
+      ),
+    );
+    if (includeHistory == null) return;
+    // savePreferences 首行同步更新内存缓存（立即驱动导出面板初始值），
+    // 写盘异步进行；不 await——与历法口径首启流程一致，避免在
+    // FakeAsync 测试环境中真实 IO 挂起整个调用链。
+    unawaited(
+      savePreferences(
+        currentPreferences.copyWith(
+          exportSetupCompleted: true,
+          exportAnalysisHistoryDefault: includeHistory,
+        ),
+      ),
+    );
+  }
+
   Future<void> _chooseExport() async {
-    final format = await showModalBottomSheet<String>(
+    await _maybePromptExportDefault();
+    if (!mounted) return;
+    final selection = await showModalBottomSheet<_ExportSelection>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -330,71 +406,43 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '导出完整档案',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  '文件包含占问、原始起卦、卦面快照、解读、反馈和计算依据。',
-                  style: TextStyle(color: _mutedInk, height: 1.45),
-                ),
-                const SizedBox(height: 16),
-                _ExportChoice(
-                  key: const Key('export-markdown'),
-                  onTap: () => Navigator.pop(context, 'markdown'),
-                  icon: Icons.description_outlined,
-                  title: '可读档案 · Markdown',
-                  description: '适合阅读、打印或继续整理',
-                ),
-                const SizedBox(height: 10),
-                _ExportChoice(
-                  key: const Key('export-json'),
-                  onTap: () => Navigator.pop(context, 'json'),
-                  icon: Icons.data_object_rounded,
-                  title: '完整数据 · JSON',
-                  description: '保留稳定字段、版本和完整快照',
-                ),
-                const SizedBox(height: 10),
-                _ExportChoice(
-                  key: const Key('export-image'),
-                  onTap: () => Navigator.pop(context, 'image'),
-                  icon: Icons.image_outlined,
-                  title: '卦面长图 · PNG',
-                  description: '包含卦面、全部解读与反馈，适合分享',
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(13),
-                  decoration: BoxDecoration(
-                    color: _softPaper.withValues(alpha: .62),
-                    borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-                    border: Border.all(color: _rule),
-                  ),
-                  child: const Text(
-                    '将包含：占问 · 起卦时间 · 本卦与变卦 · 六亲六神 · 伏神 · 计算依据 · 解读 · 反馈',
-                    style: TextStyle(color: _mutedInk, height: 1.55),
-                  ),
-                ),
-              ],
+            // 2026-09-04 需求 1+2：面板内两个内容开关（包含解读与反馈 /
+            // 包含历史版本），历史版本开关初始值来自首启选择或设置页。
+            child: _ExportSheet(
+              key: const Key('export-sheet'),
+              detail: _detail,
             ),
           ),
         ),
       ),
     );
-    if (format != null && mounted) await _export(format);
+    if (selection == null || !mounted) return;
+    await _export(
+      selection.format,
+      includeAnalysis: selection.includeAnalysis,
+      includeFeedback: selection.includeFeedback,
+      includeAnalysisHistory: selection.includeAnalysisHistory,
+    );
   }
 
-  Future<void> _export(String format) async {
+  Future<void> _export(
+    String format, {
+    bool includeAnalysis = true,
+    bool includeFeedback = true,
+    bool includeAnalysisHistory = true,
+  }) async {
     setState(() => _exporting = true);
     try {
       if (format == 'image') {
-        final bytes = await buildCaseArchivePng(context, _detail);
+        final bytes = await buildCaseArchivePng(
+          context,
+          _detail,
+          options: ArchiveImageOptions(
+            includeAnalysis: includeAnalysis,
+            includeFeedback: includeFeedback,
+            includeAnalysisHistory: includeAnalysisHistory,
+          ),
+        );
         final directory = await Directory.systemTemp.createTemp(
           'liuyao-export-',
         );
@@ -418,6 +466,10 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       final exported = await widget.client.exportCase(
         _detail.id,
         format: format,
+        // JSON 是完整数据格式，导出端忽略裁剪参数；Markdown 按选项裁剪。
+        includeAnalysis: includeAnalysis,
+        includeFeedback: includeFeedback,
+        includeAnalysisHistory: includeAnalysisHistory,
       );
       final directory = await Directory.systemTemp.createTemp('liuyao-export-');
       final file = File('${directory.path}/${exported.filename}');
@@ -501,6 +553,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             detail: _detail,
             onEdit: _editQuestionContext,
             onEditTags: _editTags,
+            onEditQuestion: _editQuestion,
           ),
           const SizedBox(height: 10),
           if (currentPreferences.showCastingRecord &&
@@ -516,34 +569,8 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             ),
             const SizedBox(height: 10),
           ],
-          if (twelveStages.isNotEmpty) ...[
-            _ResultExpansionCard(
-              key: const Key('result-twelve-section'),
-              title: '十二长生',
-              summary: _twelveStageSummary(preview.dayPillar),
-              child: LiuyaoTwelveStagesPanel(
-                preview: preview,
-                selectedReference: _growthReference,
-                onReferenceChanged: (value) {
-                  setState(() => _growthReference = value);
-                },
-                annotationMode: _annotationMode,
-                onModeChanged: (value) {
-                  setState(() => _annotationMode = value);
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          if (shensha.isNotEmpty) ...[
-            _ResultExpansionCard(
-              key: const Key('result-shensha-section'),
-              title: '神煞',
-              summary: _shenshaSummary(shensha),
-              child: LiuyaoShenshaPanel(preview: preview),
-            ),
-            const SizedBox(height: 12),
-          ],
+          // 2026-09-04 需求：十二长生与神煞卡片移至卦例下方，
+          // 保证截图分享时卦面信息居中、长生与神煞在下方完整可见。
           DSScaleIn(
             child: Container(
               key: const Key('result-chart-card'),
@@ -589,15 +616,41 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
                       ),
                     ),
                     if (_showAlmanacCalendar)
-                      LiuyaoMiniAlmanacCalendar(
-                        initialMonth: _detail.castAt,
-                      ),
+                      LiuyaoMiniAlmanacCalendar(initialMonth: _detail.castAt),
                   ],
                 ),
               ),
             ),
           ),
           const SizedBox(height: 8),
+          if (twelveStages.isNotEmpty) ...[
+            _ResultExpansionCard(
+              key: const Key('result-twelve-section'),
+              title: '十二长生',
+              summary: _twelveStageSummary(preview.dayPillar),
+              child: LiuyaoTwelveStagesPanel(
+                preview: preview,
+                selectedReference: _growthReference,
+                onReferenceChanged: (value) {
+                  setState(() => _growthReference = value);
+                },
+                annotationMode: _annotationMode,
+                onModeChanged: (value) {
+                  setState(() => _annotationMode = value);
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (shensha.isNotEmpty) ...[
+            _ResultExpansionCard(
+              key: const Key('result-shensha-section'),
+              title: '神煞',
+              summary: _shenshaSummary(shensha),
+              child: LiuyaoShenshaPanel(preview: preview),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (currentPreferences.showCalculationBasis &&
               preview.calculationTrace.isNotEmpty) ...[
             DSReveal(
@@ -626,7 +679,10 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
                 ),
                 if (_detail.analyses.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  _AnalysisHistory(items: _detail.analyses),
+                  _AnalysisHistory(
+                    items: _detail.analyses,
+                    onDelete: _confirmDeleteAnalysis,
+                  ),
                 ],
               ],
             ),
@@ -734,6 +790,279 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       error.toString().replaceFirst(RegExp(r'^.*Exception: '), '');
 }
 
+/// 导出面板的选择结果：格式 + 本次内容裁剪选项。
+class _ExportSelection {
+  const _ExportSelection({
+    required this.format,
+    required this.includeAnalysis,
+    required this.includeFeedback,
+    required this.includeAnalysisHistory,
+  });
+
+  final String format;
+  final bool includeAnalysis;
+  final bool includeFeedback;
+  final bool includeAnalysisHistory;
+}
+
+/// 导出面板：格式三选一 + 两个内容开关（2026-09-04 需求 1/2）。
+class _ExportSheet extends StatefulWidget {
+  const _ExportSheet({super.key, required this.detail});
+
+  final CaseDetail detail;
+
+  @override
+  State<_ExportSheet> createState() => _ExportSheetState();
+}
+
+class _ExportSheetState extends State<_ExportSheet> {
+  late bool _includeRecords = true;
+  late bool _includeHistory = currentPreferences.exportAnalysisHistoryDefault;
+
+  void _pop(String format) => Navigator.pop(
+    context,
+    _ExportSelection(
+      format: format,
+      includeAnalysis: _includeRecords,
+      includeFeedback: _includeRecords,
+      includeAnalysisHistory: _includeHistory,
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        '导出完整档案',
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 6),
+      const Text(
+        '文件包含占问、原始起卦、卦面快照、解读、反馈和计算依据。',
+        style: TextStyle(color: _mutedInk, height: 1.45),
+      ),
+      const SizedBox(height: 14),
+      _ExportOptionRow(
+        key: const Key('export-include-records'),
+        title: '包含解读与反馈',
+        description: '关闭后只导出卦面与占问，适合只分享卦本身',
+        value: _includeRecords,
+        onChanged: (value) => setState(() => _includeRecords = value),
+      ),
+      const SizedBox(height: 8),
+      _ExportOptionRow(
+        key: const Key('export-include-history'),
+        title: '包含解读历史版本',
+        description: _includeRecords ? '关闭后解读只保留最新一版' : '需先开启「包含解读与反馈」',
+        value: _includeHistory,
+        enabled: _includeRecords,
+        onChanged: (value) => setState(() => _includeHistory = value),
+      ),
+      const SizedBox(height: 14),
+      _ExportChoice(
+        key: const Key('export-markdown'),
+        onTap: () => _pop('markdown'),
+        icon: Icons.description_outlined,
+        title: '可读档案 · Markdown',
+        description: _includeRecords ? '适合阅读、打印或继续整理' : '仅卦面与占问，适合只分享卦本身',
+      ),
+      const SizedBox(height: 10),
+      _ExportChoice(
+        key: const Key('export-json'),
+        onTap: () => _pop('json'),
+        icon: Icons.data_object_rounded,
+        title: '完整数据 · JSON',
+        description: '备份与迁移用，始终包含全部解读与反馈',
+      ),
+      const SizedBox(height: 10),
+      _ExportChoice(
+        key: const Key('export-image'),
+        onTap: () => _pop('image'),
+        icon: Icons.image_outlined,
+        title: '卦面长图 · PNG',
+        description: _includeRecords
+            ? (_includeHistory ? '包含卦面、全部解读与反馈' : '包含卦面、最新解读与反馈')
+            : '仅卦面与占问，适合分享',
+      ),
+      const SizedBox(height: 14),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: _softPaper.withValues(alpha: .62),
+          borderRadius: BorderRadius.circular(LiuyaoRadii.small),
+          border: Border.all(color: _rule),
+        ),
+        child: Text(
+          _includeRecords
+              ? '将包含：占问 · 起卦时间 · 本卦与变卦 · 六亲六神 · 伏神 · 计算依据 · 解读${_includeHistory ? '（全部版本）' : '（最新一版）'} · 反馈'
+              : '将包含：占问 · 起卦时间 · 本卦与变卦 · 六亲六神 · 伏神',
+          style: const TextStyle(color: _mutedInk, height: 1.55),
+        ),
+      ),
+    ],
+  );
+}
+
+class _ExportOptionRow extends StatelessWidget {
+  const _ExportOptionRow({
+    super.key,
+    required this.title,
+    required this.description,
+    required this.value,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  final String title;
+  final String description;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: enabled ? 1 : .55,
+    child: Material(
+      color: _softPaper.withValues(alpha: .45),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LiuyaoRadii.small),
+        side: const BorderSide(color: _rule),
+      ),
+      child: InkWell(
+        // 整行可点切换（与设置页开关行为一致）。
+        onTap: enabled ? () => onChanged(!value) : null,
+        borderRadius: BorderRadius.circular(LiuyaoRadii.small),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      style: const TextStyle(color: _mutedInk, fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(value: value, onChanged: enabled ? onChanged : null),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 底部弹层文本编辑器：controller 由 State 持有并在 sheet 真正移除时释放。
+/// （此前在 await showModalBottomSheet 后立即 dispose 会命中「controller
+/// used after disposed」——pop 返回时关闭动画仍在使用 TextField。）
+class _TextSheetEditor extends StatefulWidget {
+  const _TextSheetEditor({
+    required this.title,
+    required this.note,
+    required this.label,
+    required this.hint,
+    required this.initialText,
+    required this.minLines,
+    required this.maxLines,
+    required this.maxLength,
+    required this.editorKey,
+    required this.saveKey,
+  });
+
+  final String title;
+  final String note;
+  final String label;
+  final String hint;
+  final String initialText;
+  final int minLines;
+  final int maxLines;
+  final int maxLength;
+  final Key editorKey;
+  final Key saveKey;
+
+  @override
+  State<_TextSheetEditor> createState() => _TextSheetEditorState();
+}
+
+class _TextSheetEditorState extends State<_TextSheetEditor> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      20,
+      8,
+      20,
+      MediaQuery.viewInsetsOf(context).bottom + 24,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          widget.note,
+          style: const TextStyle(color: _mutedInk, height: 1.4),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: widget.editorKey,
+          controller: _controller,
+          autofocus: true,
+          minLines: widget.minLines,
+          maxLines: widget.maxLines,
+          maxLength: widget.maxLength,
+          decoration: InputDecoration(
+            labelText: widget.label,
+            hintText: widget.hint,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              key: widget.saveKey,
+              onPressed: () => Navigator.pop(context, _controller.text),
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
 class _ExportChoice extends StatelessWidget {
   const _ExportChoice({
     super.key,
@@ -804,11 +1133,13 @@ class _QuestionCard extends StatelessWidget {
     required this.detail,
     required this.onEdit,
     required this.onEditTags,
+    this.onEditQuestion,
   });
 
   final CaseDetail detail;
   final VoidCallback onEdit;
   final VoidCallback onEditTags;
+  final VoidCallback? onEditQuestion;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -878,24 +1209,50 @@ class _QuestionCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 2),
-        Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(
-                text: '占问：',
-                style: TextStyle(fontWeight: FontWeight.w700),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(
+                      text: '占问：',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    TextSpan(text: detail.question),
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: LiuyaoColors.ink,
+                  fontSize: 12,
+                  height: 1.18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              TextSpan(text: detail.question),
+            ),
+            if (onEditQuestion != null) ...[
+              const SizedBox(width: 4),
+              IconButton(
+                key: const Key('edit-question'),
+                tooltip: '编辑占问',
+                onPressed: onEditQuestion,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 22,
+                  height: 22,
+                ),
+                padding: EdgeInsets.zero,
+                iconSize: 14,
+                icon: const Icon(
+                  Icons.drive_file_rename_outline,
+                  color: _cinnabar,
+                ),
+              ),
             ],
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: LiuyaoColors.ink,
-            fontSize: 12,
-            height: 1.18,
-            fontWeight: FontWeight.w600,
-          ),
+          ],
         ),
         if (detail.questionContext.trim().isNotEmpty ||
             detail.tags.isNotEmpty) ...[
@@ -1206,9 +1563,10 @@ class _AnalysisEditor extends StatelessWidget {
 }
 
 class _AnalysisHistory extends StatelessWidget {
-  const _AnalysisHistory({required this.items});
+  const _AnalysisHistory({required this.items, this.onDelete});
 
   final List<CaseAnalysis> items;
+  final void Function(CaseAnalysis item)? onDelete;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -1218,14 +1576,28 @@ class _AnalysisHistory extends StatelessWidget {
     child: ExpansionTile(
       key: const Key('analysis-history'),
       title: const Text('查看历史版本'),
-      subtitle: Text('${items.length} 个不可变版本'),
+      subtitle: Text('${items.length} 个版本'),
       children: items.reversed
           .map(
             (item) => ListTile(
+              key: Key('analysis-history-${item.revision}'),
               title: Text(
                 '版本 ${item.revision} · ${_shortDate(item.createdAt)}',
               ),
               subtitle: Text(item.body),
+              trailing: onDelete == null
+                  ? null
+                  : IconButton(
+                      key: Key('delete-analysis-${item.revision}'),
+                      tooltip: '删除该版本',
+                      onPressed: () => onDelete!(item),
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 18,
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: _cinnabar,
+                      ),
+                    ),
             ),
           )
           .toList(growable: false),

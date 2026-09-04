@@ -71,6 +71,8 @@ class _SettingsPageState extends State<SettingsPage> {
         next = _prefs.copyWith(showShenshaAndTwelveGrowth: value);
       case 'showAuxAlmanac':
         next = _prefs.copyWith(showAuxAlmanac: value);
+      case 'exportAnalysisHistoryDefault':
+        next = _prefs.copyWith(exportAnalysisHistoryDefault: value);
     }
     setState(() => _prefs = next);
     await savePreferences(next);
@@ -287,6 +289,21 @@ class _SettingsPageState extends State<SettingsPage> {
                     description: '显示值神、冲煞、星宿、建除等黄历字段',
                     value: _prefs.showAuxAlmanac,
                     onChanged: (value) => _toggle('showAuxAlmanac', value),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: DSColors.hairline.withValues(alpha: .6),
+                  ),
+                  // 2026-09-04 需求 1：导出解读历史版本的默认值（首启选择过一次，
+                  // 之后在此修改）；每次导出时仍可在导出面板临时切换。
+                  _DisplaySwitchRow(
+                    key: const Key('settings-export-analysis-history'),
+                    icon: Icons.history_edu_outlined,
+                    title: '导出默认含解读历史版本',
+                    description: '关闭后导出的解读只带最新一版；单次导出仍可临时调整',
+                    value: _prefs.exportAnalysisHistoryDefault,
+                    onChanged: (value) =>
+                        _toggle('exportAnalysisHistoryDefault', value),
                   ),
                 ],
               ),

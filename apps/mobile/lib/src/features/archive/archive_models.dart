@@ -16,6 +16,7 @@ class CaseSummary {
     required this.updatedAt,
     this.questionContext = '',
     this.questionContextUpdatedAt,
+    this.questionUpdatedAt,
     this.calendarPolicy = const <String, dynamic>{},
     this.fourPillarsContext = const <String, dynamic>{},
     this.displayContext = const <String, dynamic>{},
@@ -40,6 +41,9 @@ class CaseSummary {
         '',
     questionContextUpdatedAt: _parseOptionalDate(
       json['questionContextUpdatedAt'] ?? json['question_context_updated_at'],
+    ),
+    questionUpdatedAt: _parseOptionalDate(
+      json['questionUpdatedAt'] ?? json['question_updated_at'],
     ),
     calendarPolicy: _mapOrEmpty(
       json['calendarPolicy'] ?? json['calendar_policy'],
@@ -68,6 +72,7 @@ class CaseSummary {
   final DateTime updatedAt;
   final String questionContext;
   final DateTime? questionContextUpdatedAt;
+  final DateTime? questionUpdatedAt;
   final Map<String, dynamic> calendarPolicy;
   final Map<String, dynamic> fourPillarsContext;
   final Map<String, dynamic> displayContext;
@@ -142,6 +147,7 @@ class CaseDetail extends CaseSummary {
     required super.updatedAt,
     super.questionContext,
     super.questionContextUpdatedAt,
+    super.questionUpdatedAt,
     super.calendarPolicy,
     super.fourPillarsContext,
     super.displayContext,
@@ -188,6 +194,9 @@ class CaseDetail extends CaseSummary {
           '',
       questionContextUpdatedAt: _parseOptionalDate(
         json['questionContextUpdatedAt'] ?? json['question_context_updated_at'],
+      ),
+      questionUpdatedAt: _parseOptionalDate(
+        json['questionUpdatedAt'] ?? json['question_updated_at'],
       ),
       calendarPolicy: calendarPolicy,
       fourPillarsContext: fourPillarsContext,

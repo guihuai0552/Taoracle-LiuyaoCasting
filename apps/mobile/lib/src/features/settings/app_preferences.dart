@@ -25,6 +25,8 @@ class AppPreferences {
     this.showShenshaAndTwelveGrowth = true,
     this.showAuxAlmanac = true,
     this.customTags = const <String>[],
+    this.exportSetupCompleted = false,
+    this.exportAnalysisHistoryDefault = true,
   });
 
   /// 首次进入六爻功能的历法口径选择是否已完成。
@@ -57,6 +59,12 @@ class AppPreferences {
   /// 档案页「＋」新建的自定义标签集（未挂到档案前也保留，供筛选与快速选用）。
   final List<String> customTags;
 
+  /// 首次导出时的「解读历史版本默认值」选择是否已完成（2026-09-04 需求）。
+  final bool exportSetupCompleted;
+
+  /// 导出解读时默认是否包含历史版本（true=全部版本，false=仅最新版本）。
+  final bool exportAnalysisHistoryDefault;
+
   AppPreferences copyWith({
     bool? calendarPolicySetupCompleted,
     String? dayBoundaryStrategy,
@@ -68,6 +76,8 @@ class AppPreferences {
     bool? showShenshaAndTwelveGrowth,
     bool? showAuxAlmanac,
     List<String>? customTags,
+    bool? exportSetupCompleted,
+    bool? exportAnalysisHistoryDefault,
   }) => AppPreferences(
     calendarPolicySetupCompleted:
         calendarPolicySetupCompleted ?? this.calendarPolicySetupCompleted,
@@ -82,6 +92,9 @@ class AppPreferences {
         showShenshaAndTwelveGrowth ?? this.showShenshaAndTwelveGrowth,
     showAuxAlmanac: showAuxAlmanac ?? this.showAuxAlmanac,
     customTags: customTags ?? this.customTags,
+    exportSetupCompleted: exportSetupCompleted ?? this.exportSetupCompleted,
+    exportAnalysisHistoryDefault:
+        exportAnalysisHistoryDefault ?? this.exportAnalysisHistoryDefault,
   );
 
   Map<String, dynamic> toJson() => {
@@ -95,6 +108,8 @@ class AppPreferences {
     'showShenshaAndTwelveGrowth': showShenshaAndTwelveGrowth,
     'showAuxAlmanac': showAuxAlmanac,
     'customTags': customTags,
+    'exportSetupCompleted': exportSetupCompleted,
+    'exportAnalysisHistoryDefault': exportAnalysisHistoryDefault,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic>? json) {
@@ -119,9 +134,11 @@ class AppPreferences {
       showCalculationBasis: json['showCalculationBasis'] == true,
       showNayin: json['showNayin'] != false,
       showFiveStarsAndMansions: json['showFiveStarsAndMansions'] != false,
-      showShenshaAndTwelveGrowth:
-          json['showShenshaAndTwelveGrowth'] != false,
+      showShenshaAndTwelveGrowth: json['showShenshaAndTwelveGrowth'] != false,
       showAuxAlmanac: json['showAuxAlmanac'] != false,
+      exportSetupCompleted: json['exportSetupCompleted'] == true,
+      exportAnalysisHistoryDefault:
+          json['exportAnalysisHistoryDefault'] != false,
       customTags: [
         for (final value in (json['customTags'] as List<dynamic>? ?? const []))
           if (value is String && value.trim().isNotEmpty) value.trim(),

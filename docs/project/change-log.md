@@ -468,3 +468,25 @@
 - **SDK 兼容修复**：Flutter 3.44 的 `AppBarTheme` 已移除 `systemUiOverlayStyle` 参数（既有代码编译 error）——该行状态栏深色图标本就由 `app.dart` 全局 `AnnotatedRegion<SystemUiOverlayStyle.dark>` 保障，直接删除冗余行，行为零变化。
 - **测试基建**：导出样张插桩落盘必须整体包进 `tester.runAsync`（FakeAsync 不调度真实文件 IO，裸 `await File.writeAsBytes` 会挂死——上一轮会话中断的直接原因）；修复后三次连跑 byte 级一致，DEBUG dump 全量文本证明导出无纳音重复出口（此前疑似旧版残留样张误判）。
 - **测试**：导航测试追加断言（旧预览入口 findsNothing、Taoracle 入口存在需 scrollUntilVisible）；dart analyze lib 零问题；Flutter 全量 95 项测试通过；交付 `道谕六爻-字体统一与Taoracle-v1.16.0-arm64-release.apk`
+
+### 补记 · 手动四柱六神修复（v1.16.1，2026-09-03）
+
+- **根因**：手动填写四柱时，系统先用起卦时间自动排盘、再把手动四柱当纯显示文本覆盖——六神/旬空/十二长生/神煞一直按自动日干起算（用户报告"固定白虎起初爻"）。修复：引擎 `castChart/manualCast` 增加 `manualPillars` 参数，提供时以手动四柱替代自动历法四柱并全量重算；UI 链路透传；旧手动档案读取时按档案记录的手动四柱+原始爻值重排校正（同干不同支亦重排）；干支组合校验（拦截六十甲子外非法组合）。独立审查首轮 FAIL（1 major + 3 minor）全部修复：calculated 溯源单独按起卦时间自动推算、JSON/MD 导出走校正后卦面、补私鉴合同一致性断言。
+- 验证：引擎 28 项 + Flutter 99 项测试全过；PR #1 已合并；交付 `道谕六爻-手动四柱六神修复-v1.16.1-arm64-release.apk`（Release v1.16.1）。
+
+### 补记 · 档案左滑删除失效修复（2026-09-04）
+
+- **根因**：真实 `ArchiveClient.listCases()` 返回 `toList(growable: false)` 固定长度列表；左滑确认后 `onDismissed` 里 `_cases.removeWhere` 抛 `UnsupportedError` 被异步链吞掉，`_deleteCase` 永不执行——卡片滞留滑出位置、档案未删。长按删除（不动 `_cases`）与既有测试（fake 返回可增长列表）均正常，掩盖了该问题。修复：数据源改返回可增长列表（根源）+ `onDismissed` 改为赋值新列表（双保险）。
+- **测试基建**：端到端复现测试曾因 `testWidgets` FakeAsync 与真实文件 IO 混合死锁（`--timeout` 也无法打断）——拆分为纯 `test()`（真实落盘链路）与纯 `testWidgets`（固定列表 UI 链路），验证等价、覆盖不减。
+- 验证：Flutter 全量 102 项测试通过。
+
+### 第二十批 · 档案体验五项需求（v1.17.0，2026-09-04）
+
+- **导出内容选项**（用户需求 1/2）：导出面板重构为 StatefulWidget，新增两个内容开关——「包含解读与反馈」（关闭后 Markdown/PNG 只含卦面与占问，只分享卦本身）与「包含解读历史版本」（关闭后解读仅最新一版）。`exportCase` 与 `buildCaseArchivePng` 增加 `includeAnalysis/includeFeedback/includeAnalysisHistory` 参数；JSON 与批量迁移包按备份语义忽略裁剪参数（FR-EXP-008 口径不变）。PNG 关闭区块时整体不绘制（高度同步收缩）。
+- **历史版本默认口径**（需求 1）：首次导出弹一次性选择框「导出解读时默认包含历史版本吗？」（包含全部历史版本 / 仅最新版本），写入偏好 `exportAnalysisHistoryDefault` + `exportSetupCompleted`（沿历法口径首启先例，但可跳过、下次再问）；设置页「卦面显示」分区新增「导出默认含解读历史版本」开关；导出面板的历史版本开关以该默认值为初始值，单次可临时切换。
+- **解读历史版本删除**（需求 3）：历史版本列表每项加删除入口，AlertDialog 二次确认（FR-CAS-008）；`ArchiveDataSource.deleteAnalysis` 落盘移除，`latestAnalysisRevision` 不回退（版本号单调递增、删除留空洞），乐观锁与后续追加 revision 取水位 +1（不复用空洞）不受影响；副标题「N 个不可变版本」改为「N 个版本」。
+- **详情页卡片重排**（需求 4）：十二长生卡与神煞卡从卦面卡之前移至之后（占问与时间 → 起卦记录 → 卦面大卡 → 十二长生 → 神煞 → 计算依据 → 解读 → 反馈）；截图分享时卦面信息居中、长生神煞在下方完整可见。SPEC-007 阅读顺序与 FR-UI-024 同步修订。
+- **占问可编辑**（需求 5）：详情页占问行内新增编辑按钮，弹层可修改起卦时输入的占问文本（空回落「暂无问念」，1000 字上限，新增 `questionUpdatedAt` 溯源时间戳）；起卦记录、历法快照与卦面快照不动（FR-CAS-005 细化）；「编辑背景问念」继续作为独立补充通道保留。顺带修复两处弹层 controller 生命周期缺陷：`_TextSheetEditor`（StatefulWidget 自管 TextEditingController）替换"await 后立即 dispose"模式——旧模式在 sheet 关闭动画期间命中「controller used after disposed」（既有背景问念弹层同患，因无测试覆盖而未爆雷）。
+- **实现修正**：首启选择保存改为 `unawaited(savePreferences(...))`（内存态首行同步生效）——await 真实文件 IO 在 FakeAsync 测试环境挂起整个调用链，与历法口径首启流程的 fire-and-forget 模式对齐。
+- **文档同步**：SPEC-005 升 0.7（FR-CAS-005 细化、新增 FR-CAS-017）、SPEC-006 升 0.5（FR-EXP-002 落地、FR-EXP-007 修订、新增 FR-EXP-010/011）、SPEC-007 升 2.0（FR-UI-024 修订、新增 FR-UI-029/030/031）、决策日志 DEC-051、README 功能特性更新。
+- 验证：引擎 28 项、Flutter **113 项**测试全过（新增：数据层 6 项 + widget 4 项 + 偏好 1 项，widget 含独立审查后补的 PNG 裁剪高度差测试）；`dart analyze` 无新增问题（仅 2 项存量 info）。独立审查结论 PASS（4 条 minor：PNG 裁剪缺测试、fake revision 口径失真、FR-CAS-017 措辞不精确、首启弹窗与设置页交互口径说明——前三条已顺手修复）。
