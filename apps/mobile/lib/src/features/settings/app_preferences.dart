@@ -27,6 +27,8 @@ class AppPreferences {
     this.customTags = const <String>[],
     this.exportSetupCompleted = false,
     this.exportAnalysisHistoryDefault = true,
+    this.uiFontFamily = kUiFontSystem,
+    this.exportFontFamily = kExportFontDaoyu,
   });
 
   /// 首次进入六爻功能的历法口径选择是否已完成。
@@ -65,6 +67,13 @@ class AppPreferences {
   /// 导出解读时默认是否包含历史版本（true=全部版本，false=仅最新版本）。
   final bool exportAnalysisHistoryDefault;
 
+  /// 产品内界面字体（2026-09-05 需求）：'system'=系统默认（现状默认），
+  /// 'daoyu'=道谕宋。卦面排盘组件显式锁定道谕宋，不受此设置影响。
+  final String uiFontFamily;
+
+  /// 导出长图字体：'daoyu'=道谕宋（现状默认），'system'=系统默认。
+  final String exportFontFamily;
+
   AppPreferences copyWith({
     bool? calendarPolicySetupCompleted,
     String? dayBoundaryStrategy,
@@ -78,6 +87,8 @@ class AppPreferences {
     List<String>? customTags,
     bool? exportSetupCompleted,
     bool? exportAnalysisHistoryDefault,
+    String? uiFontFamily,
+    String? exportFontFamily,
   }) => AppPreferences(
     calendarPolicySetupCompleted:
         calendarPolicySetupCompleted ?? this.calendarPolicySetupCompleted,
@@ -95,6 +106,8 @@ class AppPreferences {
     exportSetupCompleted: exportSetupCompleted ?? this.exportSetupCompleted,
     exportAnalysisHistoryDefault:
         exportAnalysisHistoryDefault ?? this.exportAnalysisHistoryDefault,
+    uiFontFamily: uiFontFamily ?? this.uiFontFamily,
+    exportFontFamily: exportFontFamily ?? this.exportFontFamily,
   );
 
   Map<String, dynamic> toJson() => {
@@ -110,6 +123,8 @@ class AppPreferences {
     'customTags': customTags,
     'exportSetupCompleted': exportSetupCompleted,
     'exportAnalysisHistoryDefault': exportAnalysisHistoryDefault,
+    'uiFontFamily': uiFontFamily,
+    'exportFontFamily': exportFontFamily,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic>? json) {
@@ -139,6 +154,8 @@ class AppPreferences {
       exportSetupCompleted: json['exportSetupCompleted'] == true,
       exportAnalysisHistoryDefault:
           json['exportAnalysisHistoryDefault'] != false,
+      uiFontFamily: _fontChoice(json['uiFontFamily'], kUiFontSystem),
+      exportFontFamily: _fontChoice(json['exportFontFamily'], kExportFontDaoyu),
       customTags: [
         for (final value in (json['customTags'] as List<dynamic>? ?? const []))
           if (value is String && value.trim().isNotEmpty) value.trim(),
@@ -149,6 +166,19 @@ class AppPreferences {
 
 /// 目录解析注入点：生产用应用文档目录；测试可覆盖。
 Future<Directory> Function()? preferencesDirectoryOverride;
+
+/// 界面/导出字体取值域（2026-09-05 需求）：system=系统默认，daoyu=道谕宋。
+const kUiFontSystem = 'system';
+const kExportFontDaoyu = 'daoyu';
+
+String _fontChoice(Object? value, String fallback) =>
+    value == 'system' || value == 'daoyu' ? value as String : fallback;
+
+/// 界面字体全局通知：设置页切换后 MaterialApp 据此重建主题，
+/// 无需重启应用。导出字体每次导出时直读 [currentPreferences]，无需通知。
+final ValueNotifier<String> uiFontFamilyNotifier = ValueNotifier<String>(
+  kUiFontSystem,
+);
 
 String? _cachedPath;
 AppPreferences? _cached;
@@ -173,12 +203,14 @@ Future<AppPreferences> loadPreferences() async {
     // 文件损坏或不可读：回退默认值，不阻塞应用启动。
     _cached = const AppPreferences();
   }
+  uiFontFamilyNotifier.value = currentPreferences.uiFontFamily;
   return currentPreferences;
 }
 
 /// 覆盖保存偏好并写盘。
 Future<void> savePreferences(AppPreferences preferences) async {
   _cached = preferences;
+  uiFontFamilyNotifier.value = preferences.uiFontFamily;
   try {
     final path = await _resolvePath();
     final file = File(path);
@@ -194,6 +226,7 @@ Future<void> savePreferences(AppPreferences preferences) async {
 void resetPreferencesCacheForTest() {
   _cached = null;
   _cachedPath = null;
+  uiFontFamilyNotifier.value = kUiFontSystem;
 }
 
 Future<String> _resolvePath() async {

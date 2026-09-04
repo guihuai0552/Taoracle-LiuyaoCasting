@@ -20,7 +20,8 @@ const _imageContentWidth = _imageWidth - _imageMargin * 2;
 typedef _AnnotSeg = (String, Color?, bool);
 
 const _headerHeight = 84.0;
-const _infoCardHeight = 176.0;
+// 信息卡高度不再固定：占问/背景问念按实际行数完整绘制（2026-09-05
+// 用户反馈长文本被截断显示不全），高度由 _measureInfoCard() 实测。
 const _chartPillarZone = 292.0;
 const _chartHeaderZone = 68.0;
 const _lineRowHeight = 140.0;
@@ -30,16 +31,21 @@ const _chartCardHeight =
 /// 长图导出的内容选项（2026-09-04 需求）：
 /// - [includeAnalysis]/[includeFeedback] 关闭时整个区块不绘制（只分享卦本身）；
 /// - [includeAnalysisHistory] 为 false 时解读区只画最新一个版本。
+/// - [fontFamily] 为导出字体（2026-09-05 需求）：'DaoyuSong'（默认）
+///   或 null（系统默认）。字体变化引起的行宽差异由各 painter 实测
+///   布局吸收，不影响高度计算的正确性。
 class ArchiveImageOptions {
   const ArchiveImageOptions({
     this.includeAnalysis = true,
     this.includeFeedback = true,
     this.includeAnalysisHistory = true,
+    this.fontFamily = 'DaoyuSong',
   });
 
   final bool includeAnalysis;
   final bool includeFeedback;
   final bool includeAnalysisHistory;
+  final String? fontFamily;
 }
 
 Future<Uint8List> buildCaseArchivePng(
@@ -72,7 +78,117 @@ class _ArchiveImageLayout {
   final List<_MeasuredBlock> _analysisBlocks = [];
   final List<_MeasuredBlock> _feedbackBlocks = [];
 
+  /// 本次导出字体（null=系统默认）。layout 内文本绘制经 _ftext/_fseg/
+  /// _fganZhi 包装统一注入；行宽行高差异由 painter 实测布局吸收。
+  String? get _font => options.fontFamily;
+
+  void _ftext(
+    Canvas canvas,
+    String value,
+    Offset offset, {
+    required double maxWidth,
+    required double size,
+    required Color color,
+    FontWeight weight = FontWeight.w400,
+    double height = 1.2,
+    TextAlign align = TextAlign.left,
+    int? maxLines,
+  }) => _text(
+    canvas,
+    value,
+    offset,
+    maxWidth: maxWidth,
+    size: size,
+    color: color,
+    weight: weight,
+    height: height,
+    align: align,
+    maxLines: maxLines,
+    fontFamily: _font,
+  );
+
+  void _fseg(
+    Canvas canvas,
+    List<_AnnotSeg> segments,
+    Offset offset,
+    double maxWidth,
+    double size,
+  ) => _segmentsText(
+    canvas,
+    segments,
+    offset,
+    maxWidth,
+    size,
+    fontFamily: _font,
+  );
+
+  void _fganZhi(
+    Canvas canvas,
+    String relation,
+    String ganZhi,
+    Offset offset, {
+    required double size,
+    required double maxWidth,
+    TextAlign align = TextAlign.left,
+    FontWeight weight = FontWeight.w400,
+  }) => _ganZhiText(
+    canvas,
+    relation,
+    ganZhi,
+    offset,
+    size: size,
+    maxWidth: maxWidth,
+    align: align,
+    weight: weight,
+    fontFamily: _font,
+  );
+
+  // 信息卡文本按实测布局缓存，measure()/paint() 共用同一份结果，
+  // 保证高度计算与实际绘制完全一致。
+  TextPainter? _questionPainter;
+  TextPainter? _contextPainter;
+  late TextPainter _castPainter;
+  late double _infoCardHeight;
+
+  void _measureInfoCard() {
+    final width = _imageContentWidth - 56;
+    _questionPainter = _painter(
+      '占问：${detail.question}',
+      size: 40,
+      weight: FontWeight.w400,
+      color: LiuyaoColors.ink,
+      maxWidth: width,
+      fontFamily: _font,
+    );
+    final contextText = detail.questionContext.trim();
+    _contextPainter = contextText.isEmpty
+        ? null
+        : _painter(
+            '背景问念：$contextText',
+            size: 28,
+            color: LiuyaoColors.inkMuted,
+            height: 1.5,
+            maxWidth: width,
+            fontFamily: _font,
+          );
+    _castPainter = _painter(
+      '起卦：${_dateTime(detail.castAt)} · ${_castingMethodLabel(detail.castingMethod)}',
+      size: 28,
+      color: LiuyaoColors.inkMuted,
+      maxWidth: width,
+      fontFamily: _font,
+    );
+    var content = 26 + _questionPainter!.height;
+    final contextPainter = _contextPainter;
+    if (contextPainter != null) {
+      content += 12 + contextPainter.height;
+    }
+    content += 12 + _castPainter.height;
+    _infoCardHeight = content + 24;
+  }
+
   double measure() {
+    _measureInfoCard();
     _analysisBlocks.clear();
     _feedbackBlocks.clear();
     // includeAnalysisHistory=false 时只保留追加列表最后一项（最新版本；
@@ -90,6 +206,7 @@ class _ArchiveImageLayout {
                 '版本 ${analysis.revision} · ${_dateTime(analysis.createdAt)}',
             body: analysis.body,
             badge: false,
+            fontFamily: _font,
           )..measure(_imageContentWidth - 56),
         );
       }
@@ -102,6 +219,7 @@ class _ArchiveImageLayout {
                 '${_feedbackStatus(feedback.status)} · ${_dateTime(feedback.occurredAt ?? feedback.createdAt)}',
             body: feedback.body,
             badge: true,
+            fontFamily: _font,
           )..measure(_imageContentWidth - 56),
         );
       }
@@ -138,24 +256,15 @@ class _ArchiveImageLayout {
       y += _headerHeight + 28;
     }
     _paperCard(canvas, y, _infoCardHeight);
-    _text(
-      canvas,
-      '占问：${detail.question}',
-      Offset(_imageMargin + 28, y + 26),
-      maxWidth: _imageContentWidth - 56,
-      size: 40,
-      weight: FontWeight.w400,
-      color: LiuyaoColors.ink,
-      maxLines: 2,
-    );
-    _text(
-      canvas,
-      '起卦：${_dateTime(detail.castAt)} · ${_castingMethodLabel(detail.castingMethod)}',
-      Offset(_imageMargin + 28, y + 130),
-      maxWidth: _imageContentWidth - 56,
-      size: 28,
-      color: LiuyaoColors.inkMuted,
-    );
+    var infoY = y + 26;
+    _questionPainter!.paint(canvas, Offset(_imageMargin + 28, infoY));
+    infoY += _questionPainter!.height + 12;
+    final contextPainter = _contextPainter;
+    if (contextPainter != null) {
+      contextPainter.paint(canvas, Offset(_imageMargin + 28, infoY));
+      infoY += contextPainter.height + 12;
+    }
+    _castPainter.paint(canvas, Offset(_imageMargin + 28, infoY));
     y += _infoCardHeight + 28;
     y = _paintChart(canvas, y);
     if (options.includeAnalysis) {
@@ -166,7 +275,7 @@ class _ArchiveImageLayout {
       y += 34;
       y = _paintRecordSection(canvas, y, '反馈信息', _feedbackBlocks, '尚未填写反馈');
     }
-    _text(
+    _ftext(
       canvas,
       '— 卦面与记录来自本机档案 · 仅供整理与复盘 —',
       Offset(_imageMargin, y + 40),
@@ -182,7 +291,7 @@ class _ArchiveImageLayout {
   bool get _hasCustomTitle => detail.title.trim() != detail.baseHexagram;
 
   void _paintHeader(Canvas canvas, double y) {
-    _text(
+    _ftext(
       canvas,
       detail.title,
       Offset(_imageMargin, y + 4),
@@ -210,7 +319,7 @@ class _ArchiveImageLayout {
     for (var index = 0; index < pillars.length; index++) {
       final item = pillars[index];
       final x = _imageMargin + pillarWidth * index;
-      _ganZhiText(
+      _fganZhi(
         canvas,
         '',
         item.$2,
@@ -220,7 +329,7 @@ class _ArchiveImageLayout {
         align: TextAlign.center,
         weight: FontWeight.w400,
       );
-      _text(
+      _ftext(
         canvas,
         '${item.$3}空',
         Offset(x, y + 92),
@@ -230,7 +339,7 @@ class _ArchiveImageLayout {
         align: TextAlign.center,
       );
     }
-    _text(
+    _ftext(
       canvas,
       '本卦',
       Offset(_imageMargin + 88, y + 140),
@@ -239,7 +348,7 @@ class _ArchiveImageLayout {
       color: LiuyaoColors.inkMuted,
       align: TextAlign.center,
     );
-    _text(
+    _ftext(
       canvas,
       base.name,
       Offset(_imageMargin + 88, y + 174),
@@ -249,7 +358,7 @@ class _ArchiveImageLayout {
       color: LiuyaoColors.ink,
       align: TextAlign.center,
     );
-    _text(
+    _ftext(
       canvas,
       '/ ${base.palace.name}宫·${base.palaceSequence}',
       Offset(_imageMargin + 88, y + 246),
@@ -258,7 +367,7 @@ class _ArchiveImageLayout {
       color: LiuyaoColors.cinnabar,
       align: TextAlign.center,
     );
-    _text(
+    _ftext(
       canvas,
       '变卦',
       Offset(_imageMargin + 520, y + 140),
@@ -267,7 +376,7 @@ class _ArchiveImageLayout {
       color: LiuyaoColors.inkMuted,
       align: TextAlign.center,
     );
-    _text(
+    _ftext(
       canvas,
       changed?.name ?? '静卦',
       Offset(_imageMargin + 520, y + 174),
@@ -277,7 +386,7 @@ class _ArchiveImageLayout {
       color: LiuyaoColors.ink,
       align: TextAlign.center,
     );
-    _text(
+    _ftext(
       canvas,
       changed == null
           ? '/ 无变卦'
@@ -306,7 +415,7 @@ class _ArchiveImageLayout {
       ('爻', 818.0, 100.0),
     ];
     for (final item in headers) {
-      _text(
+      _ftext(
         canvas,
         item.$1,
         Offset(_imageMargin + item.$2, headerY + 10),
@@ -388,7 +497,7 @@ class _ArchiveImageLayout {
     );
     _drawLineGlyph(canvas, Offset(_imageMargin + 498, y + 44), line.yinYang);
     if (line.changing) {
-      _text(
+      _ftext(
         canvas,
         line.value == 9 ? 'Ｏ' : 'Χ',
         Offset(_imageMargin + 604, y + 30),
@@ -400,7 +509,7 @@ class _ArchiveImageLayout {
       );
     }
     if (line.role != null) {
-      _text(
+      _ftext(
         canvas,
         line.role!,
         Offset(_imageMargin + 498, y + 98),
@@ -432,7 +541,7 @@ class _ArchiveImageLayout {
         changed.yinYang,
       );
       if (changed.role != null) {
-        _text(
+        _ftext(
           canvas,
           changed.role!,
           Offset(_imageMargin + 818, y + 98),
@@ -506,7 +615,7 @@ class _ArchiveImageLayout {
     double width,
     Color color,
   ) {
-    _text(
+    _ftext(
       canvas,
       primary,
       offset,
@@ -517,7 +626,7 @@ class _ArchiveImageLayout {
       maxLines: 1,
     );
     if (secondary.isNotEmpty) {
-      _text(
+      _ftext(
         canvas,
         secondary,
         Offset(offset.dx, offset.dy + 46),
@@ -540,7 +649,7 @@ class _ArchiveImageLayout {
     required double width,
   }) {
     if (ganZhi.isEmpty) {
-      _text(
+      _ftext(
         canvas,
         '—',
         offset,
@@ -551,12 +660,12 @@ class _ArchiveImageLayout {
         maxLines: 1,
       );
     } else {
-      _ganZhiText(canvas, relation, ganZhi, offset, size: 36, maxWidth: width);
+      _fganZhi(canvas, relation, ganZhi, offset, size: 36, maxWidth: width);
     }
     var lineY = offset.dy + 46;
     for (final line in annotationLines) {
       if (line.isNotEmpty) {
-        _segmentsText(canvas, line, Offset(offset.dx, lineY), width, 22);
+        _fseg(canvas, line, Offset(offset.dx, lineY), width, 22);
         lineY += 30;
       }
     }
@@ -590,7 +699,7 @@ class _ArchiveImageLayout {
       Rect.fromLTWH(_imageMargin, y + 6, 8, 48),
       Paint()..color = LiuyaoColors.cinnabar,
     );
-    _text(
+    _ftext(
       canvas,
       title,
       Offset(_imageMargin + 24, y),
@@ -599,7 +708,7 @@ class _ArchiveImageLayout {
       weight: FontWeight.w400,
       color: LiuyaoColors.ink,
     );
-    _text(
+    _ftext(
       canvas,
       '${blocks.length} 条',
       Offset(_imageWidth - _imageMargin - 180, y + 10),
@@ -612,7 +721,7 @@ class _ArchiveImageLayout {
     final cardHeight = _sectionBodyHeight(blocks);
     _paperCard(canvas, y, cardHeight);
     if (blocks.isEmpty) {
-      _text(
+      _ftext(
         canvas,
         emptyText,
         Offset(_imageMargin + 28, y + 30),
@@ -684,11 +793,13 @@ class _MeasuredBlock {
     required this.heading,
     required this.body,
     required this.badge,
+    this.fontFamily = 'DaoyuSong',
   });
 
   final String heading;
   final String body;
   final bool badge;
+  final String? fontFamily;
   late TextPainter headingPainter;
   late TextPainter bodyPainter;
   double height = 0;
@@ -700,6 +811,7 @@ class _MeasuredBlock {
       weight: FontWeight.w400,
       color: badge ? LiuyaoColors.cinnabar : LiuyaoColors.water,
       maxWidth: width,
+      fontFamily: fontFamily,
     );
     bodyPainter = _painter(
       body,
@@ -707,6 +819,7 @@ class _MeasuredBlock {
       color: LiuyaoColors.inkMedium,
       height: 1.5,
       maxWidth: width,
+      fontFamily: fontFamily,
     );
     height = headingPainter.height + 14 + bodyPainter.height;
   }
@@ -729,6 +842,7 @@ TextPainter _painter(
   double height = 1.2,
   TextAlign align = TextAlign.left,
   int? maxLines,
+  String? fontFamily = 'DaoyuSong',
 }) {
   final painter = TextPainter(
     text: TextSpan(
@@ -738,7 +852,7 @@ TextPainter _painter(
         fontSize: size,
         fontWeight: weight,
         height: height,
-        fontFamily: 'DaoyuSong',
+        fontFamily: fontFamily,
         // 系统链仅兜底：子集外生僻字（问念人名等）回退无衬线。
         fontFamilyFallback: const [
           'PingFang SC',
@@ -766,6 +880,7 @@ void _text(
   double height = 1.2,
   TextAlign align = TextAlign.left,
   int? maxLines,
+  String? fontFamily = 'DaoyuSong',
 }) {
   final painter = _painter(
     value,
@@ -776,6 +891,7 @@ void _text(
     height: height,
     align: align,
     maxLines: maxLines,
+    fontFamily: fontFamily,
   );
   // TextPainter.paint 总以 offset 为左上角，textAlign 只作用于多行内部行对齐；
   // 单行元素的居中/居右必须手动平移，否则印章字、四柱、世应会整体左歪。
@@ -817,13 +933,14 @@ void _segmentsText(
   List<_AnnotSeg> segments,
   Offset offset,
   double maxWidth,
-  double size,
-) {
+  double size, {
+  String? fontFamily = 'DaoyuSong',
+}) {
   if (segments.isEmpty) return;
   final base = TextStyle(
     fontSize: size,
     height: 1.2,
-    fontFamily: 'DaoyuSong',
+    fontFamily: fontFamily,
     // 系统链仅兜底：子集外生僻字（问念人名等）回退无衬线。
     fontFamilyFallback: const [
       'PingFang SC',
@@ -913,12 +1030,13 @@ TextPainter _ganZhiPainter(
   required double size,
   required double maxWidth,
   FontWeight weight = FontWeight.w400,
+  String? fontFamily = 'DaoyuSong',
 }) {
   final base = TextStyle(
     fontSize: size,
     fontWeight: weight,
     height: 1.2,
-    fontFamily: 'DaoyuSong',
+    fontFamily: fontFamily,
     // 系统链仅兜底：子集外生僻字（问念人名等）回退无衬线。
     fontFamilyFallback: const [
       'PingFang SC',
@@ -974,6 +1092,7 @@ void _ganZhiText(
   required double maxWidth,
   TextAlign align = TextAlign.left,
   FontWeight weight = FontWeight.w400,
+  String? fontFamily = 'DaoyuSong',
 }) {
   final painter = _ganZhiPainter(
     relation,
@@ -981,6 +1100,7 @@ void _ganZhiText(
     size: size,
     maxWidth: maxWidth,
     weight: weight,
+    fontFamily: fontFamily,
   );
   var dx = offset.dx;
   if (align == TextAlign.center) {
