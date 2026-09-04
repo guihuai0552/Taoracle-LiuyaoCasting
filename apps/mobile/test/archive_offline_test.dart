@@ -305,4 +305,92 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test('旧手动四柱档案读取时按手动日干重排六神与旬空', () async {
+    // 复现 2026-09 修复前的存档形态：自动排盘快照（2026-09-03 庚辰日
+    // -> 白虎起初爻）+ 手动四柱只覆盖显示文本，卦面六神仍为自动日干。
+    final castAt = DateTime(2026, 9, 3, 10, 30);
+    const lines = [7, 7, 7, 8, 8, 8];
+    final autoSnapshot = manualCast(castAt, lines);
+    const manualPillars = ManualFourPillars(
+      yearGan: '丙',
+      yearZhi: '午',
+      monthGan: '丙',
+      monthZhi: '申',
+      dayGan: '甲',
+      dayZhi: '子',
+      hourGan: '己',
+      hourZhi: '巳',
+    );
+    final saved = await client.saveCast(
+      question: '旧手动档案',
+      preview: CastPreview.fromEngineResult(
+        autoSnapshot,
+        question: '旧手动档案',
+      ).applyManualFourPillars(manualPillars),
+    );
+
+    // 存档快照本身仍是旧形态（初爻白虎），但保存返回与读取均按手动
+    // 甲子日重排为青龙起初爻：saveCast / getCase 都经过 CaseDetail
+    // 解析层的旧档案校正。
+    final savedGods = saved.chart.chart.base.lines
+        .map((line) => line.sixGod)
+        .toList(growable: false);
+    expect(savedGods, ['青龙', '朱雀', '勾陈', '螣蛇', '白虎', '玄武']);
+
+    // 读取时同样按手动甲子日重排：青龙起初爻、旬空戌亥。
+    final reloaded = await client.getCase(saved.id);
+    final gods = reloaded.chart.chart.base.lines
+        .map((line) => line.sixGod)
+        .toList(growable: false);
+    expect(gods, ['青龙', '朱雀', '勾陈', '螣蛇', '白虎', '玄武']);
+    expect(reloaded.chart.dayPillar, '甲子');
+    expect(reloaded.chart.dayVoid, '戌亥');
+    expect(reloaded.fourPillarsContext['source'], 'manual');
+  });
+
+  test('自动四柱档案读取时不做手动重排', () async {
+    final saved = await client.saveCast(
+      question: '自动档案',
+      preview: makePreview(), // 2024-03-15 自动四柱
+    );
+    final reloaded = await client.getCase(saved.id);
+    expect(reloaded.chart.chart.base.lines.first.sixGod, isNotNull);
+    // 自动档案快照原样返回（time 段不被改写）。
+    expect(reloaded.chartJson['time'], saved.chartJson['time']);
+  });
+
+  test('同干不同支旧档案仍重排（庚辰自动 vs 庚寅手动，旬空不同）', () async {
+    // 2026-09-03 自动日柱庚辰（旬空申酉）；手动日柱庚寅与自动日干同为庚
+    // （六神同为白虎起初爻），但庚寅旬空午未——六神相同不可作为跳过
+    // 重排的依据，否则卦面自相矛盾。
+    final castAt = DateTime(2026, 9, 3, 10, 30);
+    const lines = [7, 7, 7, 8, 8, 8];
+    final autoSnapshot = manualCast(castAt, lines);
+    const manualPillars = ManualFourPillars(
+      yearGan: '丙',
+      yearZhi: '午',
+      monthGan: '丙',
+      monthZhi: '申',
+      dayGan: '庚',
+      dayZhi: '寅',
+      hourGan: '壬',
+      hourZhi: '午',
+    );
+    final saved = await client.saveCast(
+      question: '同干不同支',
+      preview: CastPreview.fromEngineResult(
+        autoSnapshot,
+        question: '同干不同支',
+      ).applyManualFourPillars(manualPillars),
+    );
+
+    final reloaded = await client.getCase(saved.id);
+    final gods = reloaded.chart.chart.base.lines
+        .map((line) => line.sixGod)
+        .toList(growable: false);
+    expect(gods.first, '白虎'); // 庚日起白虎，与自动结果相同
+    expect(reloaded.chart.dayPillar, '庚寅');
+    expect(reloaded.chart.dayVoid, '午未'); // 而非自动庚辰的申酉
+  });
 }

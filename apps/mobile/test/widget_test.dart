@@ -492,9 +492,7 @@ void main() {
       layerStage(null, 1, 'year'),
     );
     expect(
-      tester
-          .widget<Text>(find.byKey(const Key('base-fivestar-1')))
-          .data,
+      tester.widget<Text>(find.byKey(const Key('base-fivestar-1'))).data,
       layerStar(null, 1),
     );
     expect(
@@ -502,9 +500,7 @@ void main() {
       layerStage(preview.annotations.hiddenHexagramAnnotations, 1, 'year'),
     );
     expect(
-      tester
-          .widget<Text>(find.byKey(const Key('changed-growth-1')))
-          .data,
+      tester.widget<Text>(find.byKey(const Key('changed-growth-1'))).data,
       layerStage(preview.annotations.changedHexagramAnnotations, 1, 'year'),
     );
   });
@@ -640,8 +636,7 @@ void main() {
     // 日历默认跟随「今天」，用动态当月日期避免跨月后找不到格子。
     final now = DateTime.now();
     String two(int v) => v.toString().padLeft(2, '0');
-    final dayKey =
-        'calendar-day-${now.year}-${two(now.month)}-${two(now.day)}';
+    final dayKey = 'calendar-day-${now.year}-${two(now.month)}-${two(now.day)}';
     await tester.tap(find.byKey(Key(dayKey)));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('nav-liuyao')));
@@ -750,19 +745,13 @@ void main() {
     expect(find.byKey(const Key('settings-local-data-card')), findsOneWidget);
     expect(find.text('档案保存在本机'), findsOneWidget);
     // 2026-09-01 需求：设计系统预览入口移除，改为作者其他产品入口。
-    expect(
-      find.byKey(const Key('settings-design-preview')),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('settings-design-preview')), findsNothing);
     await tester.scrollUntilVisible(
       find.byKey(const Key('settings-taoracle-entry')),
       240,
     );
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('settings-taoracle-entry')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('settings-taoracle-entry')), findsOneWidget);
     expect(find.text('道谕Taoracle'), findsOneWidget);
   });
 
@@ -1114,10 +1103,14 @@ void main() {
         findsOneWidget,
       );
 
-      // 修改年柱天干为乙
+      // 修改年柱为乙丑（乙为阴干，需配阴支才是六十甲子内的合法组合）
       await tester.tap(find.byKey(const Key('manual-year-gan')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('乙').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('manual-year-zhi')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('丑').last);
       await tester.pumpAndSettle();
 
       await tester.dragUntilVisible(
@@ -1132,8 +1125,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(archive.saveCount, 1);
+      // 手动四柱必须传入排盘数据源：六神按手动日干起（2026-09 修复）。
+      expect(source.lastManualPillars, {
+        'year': '乙丑',
+        'month': '甲子',
+        'day': '甲子',
+        'hour': '甲子',
+      });
       expect(archive.detail.fourPillarsContext['source'], 'manual');
-      expect(archive.detail.chart.yearPillar, '乙子');
+      expect(archive.detail.chart.yearPillar, '乙丑');
       expect(
         (archive.detail.fourPillarsContext['calculated']
             as Map<String, dynamic>)['year'],
@@ -1144,8 +1144,54 @@ void main() {
             as Map<String, dynamic>)['year_gan'],
         '乙',
       );
+      expect(
+        (archive.detail.fourPillarsContext['manual']
+            as Map<String, dynamic>)['year_zhi'],
+        '丑',
+      );
     },
   );
+
+  testWidgets('manual casting rejects invalid ganzhi combination', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final source = _FakeCastingDataSource();
+    final archive = _FakeArchiveDataSource();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ManualCastingPage(
+          dataSource: source,
+          archiveDataSource: archive,
+          initialDateTime: DateTime(2026, 8, 5, 15, 26),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('手动填写'));
+    await tester.pumpAndSettle();
+
+    // 年柱天干改乙、地支保持子 → 乙子不在六十甲子内
+    await tester.tap(find.byKey(const Key('manual-year-gan')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('乙').last);
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('review-cast')),
+      find.byKey(const Key('manual-casting-scroll')),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('review-cast')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('六十甲子'), findsOneWidget);
+    expect(source.callCount, 0);
+    expect(archive.saveCount, 0);
+  });
 
   testWidgets('manual casting passes selected calendar boundary policy', (
     tester,
@@ -1243,7 +1289,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final archive = _FakeArchiveDataSource.withCase();
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ArchivePage(dataSource: archive))),
+      MaterialApp(
+        home: Scaffold(body: ArchivePage(dataSource: archive)),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -1265,7 +1313,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final archive = _FakeArchiveDataSource.withCase();
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ArchivePage(dataSource: archive))),
+      MaterialApp(
+        home: Scaffold(body: ArchivePage(dataSource: archive)),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -1713,7 +1763,10 @@ void main() {
     int pngHeight(dynamic bytes) {
       expect(bytes.take(8).toList(), [137, 80, 78, 71, 13, 10, 26, 10]);
       // PNG：8 字节签名 + IHDR(4 长度 + 4 类型) + 宽 4 字节 + 高 4 字节 big-endian。
-      return (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+      return (bytes[20] << 24) |
+          (bytes[21] << 16) |
+          (bytes[22] << 8) |
+          bytes[23];
     }
 
     final custom = await tester.runAsync(
@@ -1749,16 +1802,16 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SingleChildScrollView(child: LiuyaoChartPreview(preview: preview)),
+          body: SingleChildScrollView(
+            child: LiuyaoChartPreview(preview: preview),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('mini-almanac-calendar')), findsNothing);
-    await tester.ensureVisible(
-      find.byKey(const Key('show-almanac-calendar')),
-    );
+    await tester.ensureVisible(find.byKey(const Key('show-almanac-calendar')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('show-almanac-calendar')));
     await tester.pumpAndSettle();
@@ -1805,53 +1858,54 @@ void main() {
     );
   });
 
-  testWidgets('archive page creates custom tags and detail editor offers them', (
-    tester,
-  ) async {
-    addTearDown(resetPreferencesCacheForTest);
-    resetPreferencesCacheForTest();
-    // testWidgets 的 FakeAsync 不会调度真实 IO 回调，
-    // 偏好写盘必须经 runAsync 在真实事件循环中完成。
-    await tester.runAsync(
-      () => savePreferences(
-        currentPreferences.copyWith(customTags: const ['占工作']),
-      ),
-    );
+  testWidgets(
+    'archive page creates custom tags and detail editor offers them',
+    (tester) async {
+      addTearDown(resetPreferencesCacheForTest);
+      resetPreferencesCacheForTest();
+      // testWidgets 的 FakeAsync 不会调度真实 IO 回调，
+      // 偏好写盘必须经 runAsync 在真实事件循环中完成。
+      await tester.runAsync(
+        () => savePreferences(
+          currentPreferences.copyWith(customTags: const ['占工作']),
+        ),
+      );
 
-    // 档案页「＋ 标签」：新建自定义标签并持久化，关闭后出现在筛选行。
-    final archive = _FakeArchiveDataSource.withCase();
-    await tester.pumpWidget(
-      MaterialApp(home: ArchivePage(dataSource: archive)),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('tag-filter-add')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('tag-filter-add')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('tag-new-input')), findsOneWidget);
-    expect(find.byKey(const Key('tag-manage-custom-占工作')), findsOneWidget);
-    await tester.enterText(find.byKey(const Key('tag-new-input')), '待复盘');
-    await tester.tap(find.byKey(const Key('tag-new-add')));
-    await tester.pumpAndSettle();
-    expect(currentPreferences.customTags, contains('待复盘'));
-    await tester.tap(find.byType(ModalBarrier).last, warnIfMissed: false);
-    await tester.pump(const Duration(milliseconds: 300));
+      // 档案页「＋ 标签」：新建自定义标签并持久化，关闭后出现在筛选行。
+      final archive = _FakeArchiveDataSource.withCase();
+      await tester.pumpWidget(
+        MaterialApp(home: ArchivePage(dataSource: archive)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('tag-filter-add')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('tag-filter-add')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('tag-new-input')), findsOneWidget);
+      expect(find.byKey(const Key('tag-manage-custom-占工作')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('tag-new-input')), '待复盘');
+      await tester.tap(find.byKey(const Key('tag-new-add')));
+      await tester.pumpAndSettle();
+      expect(currentPreferences.customTags, contains('待复盘'));
+      await tester.tap(find.byType(ModalBarrier).last, warnIfMissed: false);
+      await tester.pump(const Duration(milliseconds: 300));
 
-    // 详情页编辑标签：自定义标签出现在「快速选用」建议中，点选即加入。
-    final detail = await archive.getCase(archive.detail.id);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: CaseDetailPage(client: archive, initialDetail: detail),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('edit-tags')));
-    await tester.tap(find.byKey(const Key('edit-tags')));
-    await tester.pumpAndSettle();
-    expect(find.text('快速选用'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('tag-suggest-占工作')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('tag-chip-占工作')), findsOneWidget);
-  });
+      // 详情页编辑标签：自定义标签出现在「快速选用」建议中，点选即加入。
+      final detail = await archive.getCase(archive.detail.id);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CaseDetailPage(client: archive, initialDetail: detail),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('edit-tags')));
+      await tester.tap(find.byKey(const Key('edit-tags')));
+      await tester.pumpAndSettle();
+      expect(find.text('快速选用'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('tag-suggest-占工作')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('tag-chip-占工作')), findsOneWidget);
+    },
+  );
 }
 
 class _FakeAlmanacDataSource implements AlmanacDataSource {
@@ -1985,6 +2039,23 @@ class _FakeAlmanacDataSource implements AlmanacDataSource {
   void close() {}
 }
 
+/// 测试辅助：按起卦时间自动推算四柱（对齐真实 ArchiveClient 行为）。
+Map<String, String> _autoPillarsFor(CastPreview preview) {
+  try {
+    final almanac = liuyao_engine.calculateAlmanac(
+      preview.castAt,
+      timezoneName: 'Asia/Shanghai',
+    );
+    return {
+      for (final p in almanac['four_pillars'] as List)
+        (p as Map<String, dynamic>)['position'] as String:
+            p['ganzhi'] as String,
+    };
+  } on Object {
+    return const <String, String>{};
+  }
+}
+
 class _FakeCastingDataSource implements CastingDataSource {
   int callCount = 0;
   int automaticCallCount = 0;
@@ -1993,6 +2064,7 @@ class _FakeCastingDataSource implements CastingDataSource {
   List<int>? lastLineValues;
   String? lastDayBoundary;
   String? lastMonthBoundary;
+  Map<String, String>? lastManualPillars;
 
   @override
   Future<CastPreview> previewManual({
@@ -2001,6 +2073,7 @@ class _FakeCastingDataSource implements CastingDataSource {
     required List<int> lineValues,
     String dayBoundary = liuyao_engine.dayBoundaryCivil23NextDay,
     String monthBoundary = liuyao_engine.monthBoundarySolarTermZiHour,
+    Map<String, String>? manualPillars,
   }) async {
     callCount += 1;
     lastQuestion = question;
@@ -2008,15 +2081,28 @@ class _FakeCastingDataSource implements CastingDataSource {
     lastLineValues = List.of(lineValues);
     lastDayBoundary = dayBoundary;
     lastMonthBoundary = monthBoundary;
-    return CastPreview.fromJson(
-      _castJson(
-        castAt: dateTime,
-        values: lineValues,
-        baseName: '泽天夬',
-        changedName: '天风姤',
-        method: 'manual',
-      ),
+    lastManualPillars = manualPillars;
+    final raw = _castJson(
+      castAt: dateTime,
+      values: lineValues,
+      baseName: '泽天夬',
+      changedName: '天风姤',
+      method: 'manual',
     );
+    // 忠实模拟新引擎：传入 manualPillars 时快照 time 段即为手动四柱。
+    if (manualPillars != null) {
+      final chart = Map<String, dynamic>.from(raw);
+      chart['time'] = <String, dynamic>{
+        ...Map<String, dynamic>.from(chart['time'] as Map),
+        'year': manualPillars['year'],
+        'month': manualPillars['month'],
+        'day': manualPillars['day'],
+        'hour': manualPillars['hour'],
+        'source': 'manual_input',
+      };
+      return CastPreview.fromJson(chart);
+    }
+    return CastPreview.fromJson(raw);
   }
 
   @override
@@ -2140,7 +2226,8 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
     Map<String, dynamic>? chart,
     String? questionContext,
     List<String>? tags,
-  }) {    final json = <String, dynamic>{
+  }) {
+    final json = <String, dynamic>{
       'id': detail.id,
       'title': detail.title,
       'question': detail.question,
@@ -2200,24 +2287,9 @@ class _FakeArchiveDataSource implements ArchiveDataSource {
       'updatedAt': DateTime(2026, 8, 5).toIso8601String(),
       'fourPillarsContext': <String, dynamic>{
         'source': preview.fourPillarsSource,
-        'calculated': <String, String>{
-          'year':
-              (preview.rawJson['time'] as Map<String, dynamic>)['year']
-                  as String? ??
-              preview.yearPillar,
-          'month':
-              (preview.rawJson['time'] as Map<String, dynamic>)['month']
-                  as String? ??
-              preview.monthPillar,
-          'day':
-              (preview.rawJson['time'] as Map<String, dynamic>)['day']
-                  as String? ??
-              preview.dayPillar,
-          'hour':
-              (preview.rawJson['time'] as Map<String, dynamic>)['hour']
-                  as String? ??
-              preview.hourPillar,
-        },
+        // 与真实 ArchiveClient 一致：手动模式下 calculated 单独按
+        // 起卦时间自动推算，保留溯源（rawJson.time 已是手动四柱）。
+        'calculated': _autoPillarsFor(preview),
         'manual': preview.manualFourPillars?.toJson(),
       },
       'chart': preview.fourPillarsSource == 'manual'
