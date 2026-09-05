@@ -12,7 +12,12 @@ void main() {
     // 山天大畜（纳支 子寅辰戌子寅），三爻动。
     return CastPreview.fromEngineResult(
       engine.manualCast(DateTime(2026, 8, 4, 22, 22, 29), const [
-        7, 7, 9, 8, 8, 7,
+        7,
+        7,
+        9,
+        8,
+        8,
+        7,
       ]),
       question: '五行参照',
     );
@@ -135,7 +140,9 @@ void main() {
       await tester.tap(chip);
       await tester.pumpAndSettle();
       // 卦面小字可能在滚动容器外（chip 联动后回滚顶部再读）。
-      final scrollable = tester.state<ScrollableState>(find.byType(Scrollable).first);
+      final scrollable = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
       scrollable.position.jumpTo(0);
       await tester.pumpAndSettle();
       expect(stageOf(tester, 1), entry.value);
