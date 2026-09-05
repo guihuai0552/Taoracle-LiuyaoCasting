@@ -6,6 +6,29 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:liuyao_engine/liuyao_engine.dart' as engine;
 
+enum AppThemeMode {
+  auto,
+  light,
+  dark;
+
+  static const AppThemeMode defaultMode = AppThemeMode.light;
+
+  static AppThemeMode fromStorage(String? value) {
+    return switch (value) {
+      'light' => AppThemeMode.light,
+      'dark' => AppThemeMode.dark,
+      'auto' => AppThemeMode.auto,
+      _ => defaultMode,
+    };
+  }
+
+  String get storageValue => switch (this) {
+    AppThemeMode.auto => 'auto',
+    AppThemeMode.light => 'light',
+    AppThemeMode.dark => 'dark',
+  };
+}
+
 /// 应用偏好（显示与历法口径），持久化到应用私有目录 settings.json。
 ///
 /// 设计要点：
@@ -27,6 +50,7 @@ class AppPreferences {
     this.customTags = const <String>[],
     this.exportSetupCompleted = false,
     this.exportAnalysisHistoryDefault = true,
+    this.themeMode = AppThemeMode.defaultMode,
   });
 
   /// 首次进入六爻功能的历法口径选择是否已完成。
@@ -65,6 +89,9 @@ class AppPreferences {
   /// 导出解读时默认是否包含历史版本（true=全部版本，false=仅最新版本）。
   final bool exportAnalysisHistoryDefault;
 
+  /// 主题模式：跟随系统 / 强制浅色 / 强制暗色。
+  final AppThemeMode themeMode;
+
   AppPreferences copyWith({
     bool? calendarPolicySetupCompleted,
     String? dayBoundaryStrategy,
@@ -78,6 +105,7 @@ class AppPreferences {
     List<String>? customTags,
     bool? exportSetupCompleted,
     bool? exportAnalysisHistoryDefault,
+    AppThemeMode? themeMode,
   }) => AppPreferences(
     calendarPolicySetupCompleted:
         calendarPolicySetupCompleted ?? this.calendarPolicySetupCompleted,
@@ -95,6 +123,7 @@ class AppPreferences {
     exportSetupCompleted: exportSetupCompleted ?? this.exportSetupCompleted,
     exportAnalysisHistoryDefault:
         exportAnalysisHistoryDefault ?? this.exportAnalysisHistoryDefault,
+    themeMode: themeMode ?? this.themeMode,
   );
 
   Map<String, dynamic> toJson() => {
@@ -110,6 +139,7 @@ class AppPreferences {
     'customTags': customTags,
     'exportSetupCompleted': exportSetupCompleted,
     'exportAnalysisHistoryDefault': exportAnalysisHistoryDefault,
+    'themeMode': themeMode.storageValue,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic>? json) {
@@ -139,6 +169,7 @@ class AppPreferences {
       exportSetupCompleted: json['exportSetupCompleted'] == true,
       exportAnalysisHistoryDefault:
           json['exportAnalysisHistoryDefault'] != false,
+      themeMode: AppThemeMode.fromStorage(json['themeMode'] as String?),
       customTags: [
         for (final value in (json['customTags'] as List<dynamic>? ?? const []))
           if (value is String && value.trim().isNotEmpty) value.trim(),
@@ -152,6 +183,11 @@ Future<Directory> Function()? preferencesDirectoryOverride;
 
 String? _cachedPath;
 AppPreferences? _cached;
+
+/// 偏好变更通知：根组件监听以实时应用主题模式等偏好。
+final ValueNotifier<AppPreferences> preferencesNotifier = ValueNotifier(
+  const AppPreferences(),
+);
 
 /// 当前已加载的偏好；未加载时返回默认值。
 AppPreferences get currentPreferences => _cached ?? const AppPreferences();
@@ -173,12 +209,14 @@ Future<AppPreferences> loadPreferences() async {
     // 文件损坏或不可读：回退默认值，不阻塞应用启动。
     _cached = const AppPreferences();
   }
+  preferencesNotifier.value = currentPreferences;
   return currentPreferences;
 }
 
 /// 覆盖保存偏好并写盘。
 Future<void> savePreferences(AppPreferences preferences) async {
   _cached = preferences;
+  preferencesNotifier.value = preferences;
   try {
     final path = await _resolvePath();
     final file = File(path);
@@ -194,6 +232,7 @@ Future<void> savePreferences(AppPreferences preferences) async {
 void resetPreferencesCacheForTest() {
   _cached = null;
   _cachedPath = null;
+  preferencesNotifier.value = const AppPreferences();
 }
 
 Future<String> _resolvePath() async {
