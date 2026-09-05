@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../tokens/ds_colors.dart';
 import '../tokens/ds_radius.dart';
+import '../tokens/ds_theme_extension.dart';
 
-/// 徽标语气：决定前景/背景配色。
 enum DSBadgeTone { celadon, jade, cinnabar, coldBlue, neutral }
 
-/// 徽标：用于动爻、世应、六神、旺衰、空亡、月建日辰、结果倾向等短标签。
-///
-/// 纯展示组件；[label] 由调用方传入，不参与任何业务判断。
 class DSBadge extends StatelessWidget {
   const DSBadge({
     super.key,
@@ -25,32 +21,35 @@ class DSBadge extends StatelessWidget {
   final IconData? icon;
   final bool dense;
 
-  static Color _foreground(DSBadgeTone tone) => switch (tone) {
-    DSBadgeTone.celadon => DSColors.celadonDeep,
-    DSBadgeTone.jade => DSColors.jade,
-    DSBadgeTone.cinnabar => DSColors.cinnabarSoft,
-    DSBadgeTone.coldBlue => DSColors.coldBlue,
-    DSBadgeTone.neutral => DSColors.textSecondary,
-  };
+  static Color _foreground(DSColorsScheme ds, DSBadgeTone tone) =>
+      switch (tone) {
+        DSBadgeTone.celadon => ds.celadonDeep,
+        DSBadgeTone.jade => ds.jade,
+        DSBadgeTone.cinnabar => ds.cinnabarSoft,
+        DSBadgeTone.coldBlue => ds.coldBlue,
+        DSBadgeTone.neutral => ds.textSecondary,
+      };
 
-  static Color _background(DSBadgeTone tone) => switch (tone) {
-    DSBadgeTone.celadon => DSColors.celadon.withValues(alpha: .16),
-    DSBadgeTone.jade => DSColors.jade.withValues(alpha: .16),
-    DSBadgeTone.cinnabar => DSColors.cinnabar.withValues(alpha: .18),
-    DSBadgeTone.coldBlue => DSColors.coldBlue.withValues(alpha: .14),
-    DSBadgeTone.neutral => DSColors.moonWhite.withValues(alpha: .08),
-  };
+  static Color _background(DSColorsScheme ds, DSBadgeTone tone) =>
+      switch (tone) {
+        DSBadgeTone.celadon => ds.celadon.withValues(alpha: .16),
+        DSBadgeTone.jade => ds.jade.withValues(alpha: .16),
+        DSBadgeTone.cinnabar => ds.cinnabar.withValues(alpha: .18),
+        DSBadgeTone.coldBlue => ds.coldBlue.withValues(alpha: .14),
+        DSBadgeTone.neutral => ds.moonWhite.withValues(alpha: .08),
+      };
 
   @override
   Widget build(BuildContext context) {
-    final fg = _foreground(tone);
+    final ds = context.ds;
+    final fg = _foreground(ds, tone);
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: dense ? 7 : 9,
         vertical: dense ? 2.5 : 4,
       ),
       decoration: BoxDecoration(
-        color: filled ? fg : _background(tone),
+        color: filled ? fg : _background(ds, tone),
         borderRadius: BorderRadius.circular(DSRadius.pill),
         border: filled
             ? null
@@ -63,14 +62,14 @@ class DSBadge extends StatelessWidget {
             Icon(
               icon,
               size: dense ? 10 : 12,
-              color: filled ? DSColors.background : fg,
+              color: filled ? ds.background : fg,
             ),
             SizedBox(width: dense ? 2 : 3),
           ],
           Text(
             label,
             style: TextStyle(
-              color: filled ? DSColors.background : fg,
+              color: filled ? ds.background : fg,
               fontSize: dense ? 9 : 10,
               fontWeight: FontWeight.w600,
               letterSpacing: .2,
