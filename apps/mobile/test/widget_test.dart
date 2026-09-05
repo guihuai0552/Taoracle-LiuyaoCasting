@@ -747,6 +747,15 @@ void main() {
     await tester.tap(find.text('设置'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-title')), findsOneWidget);
+    expect(
+      find.byKey(const Key('settings-theme-mode-control')),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings-local-data-card')),
+      240,
+    );
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-local-data-card')), findsOneWidget);
     expect(find.text('档案保存在本机'), findsOneWidget);
     // 2026-09-01 需求：设计系统预览入口移除，改为作者其他产品入口。
@@ -758,6 +767,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-taoracle-entry')), findsOneWidget);
     expect(find.text('道谕Taoracle'), findsOneWidget);
+  });
+
+  testWidgets('settings theme mode switch applies live and persists', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.runAsync(
+      () => savePreferences(
+        const AppPreferences().copyWith(calendarPolicySetupCompleted: true),
+      ),
+    );
+    final source = _FakeAlmanacDataSource();
+    final castingSource = _FakeCastingDataSource();
+    await tester.pumpWidget(
+      LiuyaoArchiveApp(
+        almanacDataSource: source,
+        castingDataSource: castingSource,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('settings-theme-mode-control')),
+      findsOneWidget,
+    );
+    Brightness brightnessOf(String key) =>
+        Theme.of(tester.element(find.byKey(Key(key)))).brightness;
+    expect(brightnessOf('settings-theme-mode-title'), Brightness.light);
+
+    await tester.tap(find.text('暗色'));
+    await tester.pumpAndSettle();
+
+    expect(currentPreferences.themeMode, AppThemeMode.dark);
+    expect(brightnessOf('settings-theme-mode-title'), Brightness.dark);
+
+    await tester.tap(find.text('浅色'));
+    await tester.pumpAndSettle();
+    expect(currentPreferences.themeMode, AppThemeMode.light);
+    expect(brightnessOf('settings-theme-mode-title'), Brightness.light);
   });
 
   testWidgets('manual editor serializes top-down edits bottom-to-top', (
