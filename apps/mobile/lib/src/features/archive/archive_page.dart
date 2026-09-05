@@ -10,15 +10,9 @@ import 'archive_models.dart';
 import 'case_detail_page.dart';
 import '../settings/app_preferences.dart';
 import '../../ui/design_system/components/daoyu_brand_title.dart';
-import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_theme_extension.dart';
 import '../../ui/design_system/tokens/ds_typography.dart';
 import '../../ui/liuyao_design.dart';
-
-const _ink = LiuyaoColors.ink;
-const _mutedInk = LiuyaoColors.inkMuted;
-const _cinnabar = LiuyaoColors.cinnabar;
-const _paper = LiuyaoColors.paperRaised;
-const _rule = LiuyaoColors.inkFaint;
 
 class ArchivePage extends StatefulWidget {
   const ArchivePage({super.key, this.dataSource});
@@ -136,9 +130,7 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
           ),
           FilledButton(
             key: const Key('archive-delete-confirm'),
-            style: FilledButton.styleFrom(
-              backgroundColor: LiuyaoColors.cinnabar,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: context.lc.cinnabar),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('删除'),
           ),
@@ -178,7 +170,7 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (context) => _TransferSheet(caseCount: _totalCount),
     );
     if (!mounted || action == null) return;
@@ -245,7 +237,7 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
         context: context,
         isScrollControlled: true,
         showDragHandle: true,
-        backgroundColor: _paper,
+        backgroundColor: context.lc.paperRaised,
         builder: (context) => _ImportReviewSheet(preview: preview),
       );
       if (!mounted || mode == null) return;
@@ -369,10 +361,12 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
                         // 列表刷新时被再 build 一次，触发树内残留断言。
                         resizeDuration: null,
                         background: _swipeDeleteBackground(
+                          context: context,
                           alignment: Alignment.centerLeft,
                           padding: const EdgeInsets.only(left: 24),
                         ),
                         secondaryBackground: _swipeDeleteBackground(
+                          context: context,
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 24),
                         ),
@@ -415,10 +409,10 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 '案例库',
                 style: TextStyle(
-                  color: _mutedInk,
+                  color: context.lc.inkMuted,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 2,
                 ),
@@ -427,9 +421,9 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
               // 「道谕六爻」品牌标题统一组件（本页为样式基准）。
               const DaoyuBrandTitle(keyOverride: Key('archive-title')),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 '本机持久保存 · 退出后台或重启后仍会保留',
-                style: TextStyle(color: _mutedInk, fontSize: 12),
+                style: TextStyle(color: context.lc.inkMuted, fontSize: 12),
               ),
             ],
           ),
@@ -463,9 +457,9 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
   Widget _buildSearch() {
     return Container(
       decoration: BoxDecoration(
-        color: _paper,
+        color: context.lc.paperRaised,
         borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        border: Border.all(color: _rule, width: .8),
+        border: Border.all(color: context.lc.inkFaint, width: .8),
       ),
       child: TextField(
         key: const Key('archive-search'),
@@ -515,9 +509,9 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
                 setState(_activeTags.clear);
                 _load();
               },
-              backgroundColor: _paper,
-              selectedColor: _paper,
-              side: const BorderSide(color: _rule),
+              backgroundColor: context.lc.paperRaised,
+              selectedColor: context.lc.paperRaised,
+              side: BorderSide(color: context.lc.inkFaint),
             );
           }
           final tagIndex = index - (hasClear ? 1 : 0);
@@ -528,10 +522,10 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
             key: const Key('tag-filter-add'),
             label: const Text('＋ 标签'),
             onPressed: _manageTags,
-            backgroundColor: _paper,
-            side: const BorderSide(color: _rule),
-            labelStyle: const TextStyle(
-              color: _cinnabar,
+            backgroundColor: context.lc.paperRaised,
+            side: BorderSide(color: context.lc.inkFaint),
+            labelStyle: TextStyle(
+              color: context.lc.cinnabar,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -546,7 +540,7 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       isScrollControlled: true,
       builder: (context) =>
           _TagManagerSheet(allTags: _allTags, caseCountByTag: _tagCounts),
@@ -570,15 +564,17 @@ class _ArchivePageState extends State<ArchivePage> with WidgetsBindingObserver {
         });
         _load();
       },
-      backgroundColor: _paper,
-      selectedColor: _cinnabar.withValues(alpha: .15),
-      checkmarkColor: _cinnabar,
+      backgroundColor: context.lc.paperRaised,
+      selectedColor: context.lc.cinnabar.withValues(alpha: .15),
+      checkmarkColor: context.lc.cinnabar,
       labelStyle: TextStyle(
-        color: selected ? _cinnabar : _mutedInk,
+        color: selected ? context.lc.cinnabar : context.lc.inkMuted,
         fontSize: 12,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
       ),
-      side: BorderSide(color: selected ? _cinnabar : _rule),
+      side: BorderSide(
+        color: selected ? context.lc.cinnabar : context.lc.inkFaint,
+      ),
     );
   }
 
@@ -606,7 +602,7 @@ class _TransferSheet extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '当前本机共 $caseCount 条档案。迁移包完整保留卦面快照、全部解读版本和反馈记录。',
-            style: const TextStyle(color: _mutedInk, height: 1.5),
+            style: TextStyle(color: context.lc.inkMuted, height: 1.5),
           ),
           const SizedBox(height: 16),
           _TransferChoice(
@@ -648,10 +644,10 @@ class _TransferChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: LiuyaoColors.parchment.withValues(alpha: .48),
+    color: context.lc.parchment.withValues(alpha: .48),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-      side: const BorderSide(color: _rule),
+      side: BorderSide(color: context.lc.inkFaint),
     ),
     child: InkWell(
       onTap: onTap,
@@ -664,11 +660,11 @@ class _TransferChoice extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: _paper,
-                border: Border.all(color: _rule),
+                color: context.lc.paperRaised,
+                border: Border.all(color: context.lc.inkFaint),
                 borderRadius: BorderRadius.circular(LiuyaoRadii.small),
               ),
-              child: Icon(icon, color: _cinnabar),
+              child: Icon(icon, color: context.lc.cinnabar),
             ),
             const SizedBox(width: 13),
             Expanded(
@@ -682,8 +678,8 @@ class _TransferChoice extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     description,
-                    style: const TextStyle(
-                      color: _mutedInk,
+                    style: TextStyle(
+                      color: context.lc.inkMuted,
                       fontSize: 12,
                       height: 1.4,
                     ),
@@ -691,7 +687,7 @@ class _TransferChoice extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: _mutedInk),
+            Icon(Icons.chevron_right_rounded, color: context.lc.inkMuted),
           ],
         ),
       ),
@@ -708,11 +704,11 @@ class _MigrationNotice extends StatelessWidget {
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-      border: Border.all(color: _rule),
+      border: Border.all(color: context.lc.inkFaint),
     ),
-    child: const Text(
+    child: Text(
       '迁移文件可能包含私人占问内容，请使用可信渠道传输并妥善保管。',
-      style: TextStyle(color: _mutedInk, height: 1.45, fontSize: 12),
+      style: TextStyle(color: context.lc.inkMuted, height: 1.45, fontSize: 12),
     ),
   );
 }
@@ -737,8 +733,8 @@ class _ImportReviewSheet extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             preview.sourceLabel,
-            style: const TextStyle(
-              color: _cinnabar,
+            style: TextStyle(
+              color: context.lc.cinnabar,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -747,9 +743,9 @@ class _ImportReviewSheet extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: LiuyaoColors.parchment.withValues(alpha: .45),
+              color: context.lc.parchment.withValues(alpha: .45),
               borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-              border: Border.all(color: _rule),
+              border: Border.all(color: context.lc.inkFaint),
             ),
             child: Wrap(
               spacing: 22,
@@ -772,9 +768,13 @@ class _ImportReviewSheet extends StatelessWidget {
             label: const Text('安全合并（推荐）'),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '相同档案自动跳过；同 ID 但内容不同的档案保留为“导入副本”，不覆盖本机记录。',
-            style: TextStyle(color: _mutedInk, height: 1.4, fontSize: 12),
+            style: TextStyle(
+              color: context.lc.inkMuted,
+              height: 1.4,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 14),
           OutlinedButton.icon(
@@ -804,13 +804,13 @@ class _ImportMetric extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: const TextStyle(
-            color: _ink,
+          style: TextStyle(
+            color: context.lc.ink,
             fontSize: 21,
             fontWeight: FontWeight.w600,
           ),
         ),
-        Text(label, style: const TextStyle(color: _mutedInk, fontSize: 11)),
+        Text(label, style: TextStyle(color: context.lc.inkMuted, fontSize: 11)),
       ],
     ),
   );
@@ -818,12 +818,13 @@ class _ImportMetric extends StatelessWidget {
 
 /// 滑动删除背景（挂历式）：朱砂底 + 删除图标与文字，圆角与卡片一致。
 Widget _swipeDeleteBackground({
+  required BuildContext context,
   required Alignment alignment,
   required EdgeInsets padding,
 }) {
   return Container(
     decoration: BoxDecoration(
-      color: LiuyaoColors.cinnabar.withValues(alpha: .92),
+      color: context.lc.cinnabar.withValues(alpha: .92),
       borderRadius: BorderRadius.circular(12),
     ),
     alignment: alignment,
@@ -865,7 +866,7 @@ class _CaseCard extends StatelessWidget {
         ? '${item.baseHexagram} · 静卦'
         : '${item.baseHexagram} 之 ${item.changedHexagram}';
     return Material(
-      color: _paper,
+      color: context.lc.paperRaised,
       borderRadius: BorderRadius.circular(LiuyaoRadii.card),
       child: InkWell(
         key: Key('archive-case-${item.id}'),
@@ -876,7 +877,7 @@ class _CaseCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: DSColors.hairline, width: 1),
+            border: Border.all(color: context.ds.hairline, width: 1),
           ),
           child: Row(
             children: [
@@ -892,7 +893,7 @@ class _CaseCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
-                      color: DSColors.cinnabar,
+                      color: context.ds.cinnabar,
                       fontFamily: 'DaoyuSong',
                     ),
                   ),
@@ -908,8 +909,8 @@ class _CaseCard extends StatelessWidget {
                       key: Key('archive-question-${item.id}'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _ink,
+                      style: TextStyle(
+                        color: context.lc.ink,
                         fontSize: 15,
                         height: 1.25,
                         fontWeight: FontWeight.w600,
@@ -927,7 +928,7 @@ class _CaseCard extends StatelessWidget {
                             style: DSTypography.body(
                               fontSize: 11,
                               weight: FontWeight.w400,
-                              color: DSColors.textMuted,
+                              color: context.ds.textMuted,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -940,7 +941,7 @@ class _CaseCard extends StatelessWidget {
                               style: DSTypography.body(
                                 fontSize: 11,
                                 weight: FontWeight.w400,
-                                color: DSColors.textMuted,
+                                color: context.ds.textMuted,
                               ),
                             ),
                           ),
@@ -968,18 +969,18 @@ class _CaseCard extends StatelessWidget {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: DSColors.paper,
+                                  color: context.ds.paper,
                                   borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: DSColors.amber.withValues(
+                                    color: context.ds.amber.withValues(
                                       alpha: .55,
                                     ),
                                   ),
                                 ),
                                 child: Text(
                                   tag,
-                                  style: const TextStyle(
-                                    color: Color(0xFF5A5145),
+                                  style: TextStyle(
+                                    color: context.ds.textSecondary,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -1021,13 +1022,13 @@ class _EmptyArchive extends StatelessWidget {
           Container(
             width: 76,
             height: 76,
-            decoration: const BoxDecoration(
-              color: _ink,
+            decoration: BoxDecoration(
+              color: context.lc.ink,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.inventory_2_outlined,
-              color: LiuyaoColors.paper,
+              color: context.lc.paper,
               size: 34,
             ),
           ),
@@ -1042,7 +1043,7 @@ class _EmptyArchive extends StatelessWidget {
           Text(
             error ?? '完成起卦后会自动写入本机；只有卸载应用或主动清除应用数据才会删除。',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: _mutedInk, height: 1.5),
+            style: TextStyle(color: context.lc.inkMuted, height: 1.5),
           ),
           if (error != null) ...[
             const SizedBox(height: 18),
@@ -1067,10 +1068,10 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: DSColors.glowCinnabar,
+      color: context.ds.glowCinnabar,
       borderRadius: BorderRadius.circular(14),
     ),
-    child: Text(message, style: const TextStyle(color: _cinnabar)),
+    child: Text(message, style: TextStyle(color: context.lc.cinnabar)),
   );
 }
 
@@ -1149,9 +1150,13 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             '新建标签后会出现在筛选行；在卦面详情「编辑标签」中可快速选用。',
-            style: TextStyle(color: _mutedInk, fontSize: 12, height: 1.4),
+            style: TextStyle(
+              color: context.lc.inkMuted,
+              fontSize: 12,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 14),
           Row(
@@ -1167,18 +1172,18 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
                     counterText: '',
                     isDense: true,
                     filled: true,
-                    fillColor: _paper,
+                    fillColor: context.lc.paperRaised,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 10,
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: _rule),
+                      borderSide: BorderSide(color: context.lc.inkFaint),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: _cinnabar),
+                      borderSide: BorderSide(color: context.lc.cinnabar),
                     ),
                   ),
                 ),
@@ -1188,7 +1193,7 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
                 key: const Key('tag-new-add'),
                 onPressed: _add,
                 style: FilledButton.styleFrom(
-                  backgroundColor: _cinnabar,
+                  backgroundColor: context.lc.cinnabar,
                   minimumSize: const Size(72, 42),
                 ),
                 child: const Text('添加'),
@@ -1199,7 +1204,7 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
             const SizedBox(height: 6),
             Text(
               _error!,
-              style: const TextStyle(color: _cinnabar, fontSize: 12),
+              style: TextStyle(color: context.lc.cinnabar, fontSize: 12),
             ),
           ],
           const SizedBox(height: 14),
@@ -1221,8 +1226,8 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
                       style: const TextStyle(fontSize: 12),
                     ),
                     onPressed: null,
-                    backgroundColor: _paper,
-                    side: const BorderSide(color: _rule),
+                    backgroundColor: context.lc.paperRaised,
+                    side: BorderSide(color: context.lc.inkFaint),
                   ),
               ],
             ),
@@ -1245,16 +1250,20 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
                     onDeleted: () => _persist(
                       _customTags.where((item) => item != tag).toList(),
                     ),
-                    deleteIconColor: _mutedInk,
-                    backgroundColor: _paper,
-                    side: const BorderSide(color: _rule),
+                    deleteIconColor: context.lc.inkMuted,
+                    backgroundColor: context.lc.paperRaised,
+                    side: BorderSide(color: context.lc.inkFaint),
                   ),
               ],
             ),
           ] else ...[
             Text(
               '还没有自定义标签；输入名称后点「添加」创建。',
-              style: TextStyle(color: _mutedInk, fontSize: 12, height: 1.4),
+              style: TextStyle(
+                color: context.lc.inkMuted,
+                fontSize: 12,
+                height: 1.4,
+              ),
             ),
           ],
         ],
