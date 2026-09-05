@@ -1,20 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:liuyao_engine/liuyao_engine.dart' as engine;
 
-import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_theme_extension.dart';
 import '../../ui/liuyao_design.dart';
 import '../archive/archive_client.dart';
 import '../archive/case_detail_page.dart';
 import '../settings/app_preferences.dart';
 import 'casting_client.dart';
 import 'casting_models.dart';
-
-const _ink = LiuyaoColors.ink;
-const _mutedInk = LiuyaoColors.inkMuted;
-const _cinnabar = LiuyaoColors.cinnabar;
-const _paper = LiuyaoColors.paperRaised;
-const _softPaper = LiuyaoColors.parchment;
-const _rule = LiuyaoColors.inkFaint;
 
 class ManualCastingPage extends StatefulWidget {
   const ManualCastingPage({
@@ -206,7 +199,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (context) => _CastingConfirmation(
         question: question,
         dateTime: _dateTime,
@@ -358,18 +351,18 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
                 style: ButtonStyle(
                   visualDensity: VisualDensity.compact,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  side: const WidgetStatePropertyAll(
-                    BorderSide(color: _cinnabar),
+                  side: WidgetStatePropertyAll(
+                    BorderSide(color: context.lc.cinnabar),
                   ),
                   backgroundColor: WidgetStateProperty.resolveWith(
                     (states) => states.contains(WidgetState.selected)
-                        ? _cinnabar
-                        : _softPaper,
+                        ? context.lc.cinnabar
+                        : context.lc.parchment,
                   ),
                   foregroundColor: WidgetStateProperty.resolveWith(
                     (states) => states.contains(WidgetState.selected)
                         ? Colors.white
-                        : _ink,
+                        : context.lc.ink,
                   ),
                 ),
                 onSelectionChanged: (selection) {
@@ -392,7 +385,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
                     onTap: _pickDate,
                   ),
                 ),
-                Container(width: 1, height: 44, color: _rule),
+                Container(width: 1, height: 44, color: context.lc.inkFaint),
                 Expanded(
                   child: _DateTimeButton(
                     key: const Key('casting-time'),
@@ -405,9 +398,9 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
               ],
             )
           else ...[
-            const Text(
+            Text(
               '手动填写覆盖自动计算，仅保存到本次档案',
-              style: TextStyle(color: _mutedInk, fontSize: 10),
+              style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
             ),
             const SizedBox(height: 10),
             _ManualPillarsEditor(
@@ -442,7 +435,11 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.explore_outlined, size: 17, color: _cinnabar),
+              Icon(
+                Icons.explore_outlined,
+                size: 17,
+                color: context.lc.cinnabar,
+              ),
               const SizedBox(width: 7),
               const Text(
                 '历法口径',
@@ -452,23 +449,26 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
               Text(
                 '在设置中更改',
                 key: const Key('calendar-policy-hint'),
-                style: TextStyle(color: _mutedInk, fontSize: 10),
+                style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
               ),
             ],
           ),
           const SizedBox(height: 3),
-          const Text(
+          Text(
             '口径随本次起卦存档，历史档案不受影响',
-            style: TextStyle(color: _mutedInk, fontSize: 10),
+            style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
           ),
           const SizedBox(height: 10),
-          Text('交日', style: const TextStyle(color: _mutedInk, fontSize: 11)),
+          Text(
+            '交日',
+            style: TextStyle(color: context.lc.inkMuted, fontSize: 11),
+          ),
           const SizedBox(height: 4),
           Text(
             dayLabel,
             key: const Key('day-boundary-value'),
-            style: const TextStyle(
-              color: _ink,
+            style: TextStyle(
+              color: context.lc.ink,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -476,16 +476,23 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
           const SizedBox(height: 6),
           Text(
             dayHint,
-            style: const TextStyle(color: _mutedInk, fontSize: 9, height: 1.4),
+            style: TextStyle(
+              color: context.lc.inkMuted,
+              fontSize: 9,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 10),
-          Text('交月', style: const TextStyle(color: _mutedInk, fontSize: 11)),
+          Text(
+            '交月',
+            style: TextStyle(color: context.lc.inkMuted, fontSize: 11),
+          ),
           const SizedBox(height: 4),
           Text(
             monthLabel,
             key: const Key('month-boundary-value'),
-            style: const TextStyle(
-              color: _ink,
+            style: TextStyle(
+              color: context.lc.ink,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -493,7 +500,11 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
           const SizedBox(height: 6),
           Text(
             monthHint,
-            style: const TextStyle(color: _mutedInk, fontSize: 9, height: 1.4),
+            style: TextStyle(
+              color: context.lc.inkMuted,
+              fontSize: 9,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -504,7 +515,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -515,7 +526,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
               SizedBox(height: 3),
               Text(
                 '界面上爻在上；提交按初爻到上爻记录',
-                style: TextStyle(color: _mutedInk, fontSize: 12),
+                style: TextStyle(color: context.lc.inkMuted, fontSize: 12),
               ),
             ],
           ),
@@ -523,8 +534,8 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
         Text(
           _lineValues.join(' · '),
           key: const Key('line-value-summary'),
-          style: const TextStyle(
-            color: _cinnabar,
+          style: TextStyle(
+            color: context.lc.cinnabar,
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
@@ -566,8 +577,8 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
             onPressed: _submitting ? null : _reset,
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              side: const BorderSide(color: _cinnabar),
-              foregroundColor: _ink,
+              side: BorderSide(color: context.lc.cinnabar),
+              foregroundColor: context.lc.ink,
             ),
             child: const Text('重置'),
           ),
@@ -579,7 +590,7 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
             onPressed: _submitting ? null : _reviewAndSubmit,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              backgroundColor: LiuyaoColors.cinnabar,
+              backgroundColor: context.lc.cinnabar,
             ),
             child: _submitting
                 ? const SizedBox.square(
@@ -598,9 +609,9 @@ class _ManualCastingPageState extends State<ManualCastingPage> {
 
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
-      color: _paper,
+      color: context.lc.paperRaised,
       borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-      border: Border.all(color: _rule, width: .8),
+      border: Border.all(color: context.lc.inkFaint, width: .8),
     );
   }
 
@@ -658,10 +669,10 @@ class _LineEditorRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
       decoration: BoxDecoration(
-        color: line.moving ? DSColors.glowCinnabar : _softPaper,
+        color: line.moving ? context.ds.glowCinnabar : context.lc.parchment,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: line.moving ? DSColors.accentLine : Colors.transparent,
+          color: line.moving ? context.ds.accentLine : Colors.transparent,
         ),
       ),
       child: Row(
@@ -687,7 +698,7 @@ class _LineEditorRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _paper,
+                    color: context.lc.paperRaised,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: _YaoGlyph(yang: line.yang),
@@ -702,13 +713,15 @@ class _LineEditorRow extends StatelessWidget {
             selected: line.moving,
             onSelected: (_) => onToggleMoving(),
             showCheckmark: false,
-            selectedColor: _cinnabar,
-            backgroundColor: _paper,
+            selectedColor: context.lc.cinnabar,
+            backgroundColor: context.lc.paperRaised,
             labelStyle: TextStyle(
-              color: line.moving ? Colors.white : _mutedInk,
+              color: line.moving ? Colors.white : context.lc.inkMuted,
               fontWeight: FontWeight.w700,
             ),
-            side: BorderSide(color: line.moving ? _cinnabar : _rule),
+            side: BorderSide(
+              color: line.moving ? context.lc.cinnabar : context.lc.inkFaint,
+            ),
           ),
           const SizedBox(width: 7),
           SizedBox(
@@ -718,14 +731,14 @@ class _LineEditorRow extends StatelessWidget {
               children: [
                 Text(
                   '${line.value}',
-                  style: const TextStyle(
-                    color: _cinnabar,
+                  style: TextStyle(
+                    color: context.lc.cinnabar,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
                   line.name,
-                  style: const TextStyle(color: _mutedInk, fontSize: 10),
+                  style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
                 ),
               ],
             ),
@@ -746,7 +759,7 @@ class _YaoGlyph extends StatelessWidget {
     final segment = Container(
       height: 7,
       decoration: BoxDecoration(
-        color: _cinnabar,
+        color: context.lc.cinnabar,
         borderRadius: BorderRadius.circular(5),
       ),
     );
@@ -784,7 +797,7 @@ class _DateTimeButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: _cinnabar),
+            Icon(icon, size: 20, color: context.lc.cinnabar),
             const SizedBox(width: 9),
             Expanded(
               child: Column(
@@ -792,7 +805,7 @@ class _DateTimeButton extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(color: _mutedInk, fontSize: 10),
+                    style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -841,16 +854,16 @@ class _CastingConfirmation extends StatelessWidget {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               '排盘成功后将自动存入档案，并打开独立卦面。',
-              style: TextStyle(color: _mutedInk),
+              style: TextStyle(color: context.lc.inkMuted),
             ),
             const SizedBox(height: 18),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _softPaper,
+                color: context.lc.parchment,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -866,7 +879,7 @@ class _CastingConfirmation extends StatelessWidget {
                   Text(
                     '${dateTime.year}-${_two(dateTime.month)}-${_two(dateTime.day)} '
                     '${_two(dateTime.hour)}:${_two(dateTime.minute)} · 北京时间',
-                    style: const TextStyle(color: _mutedInk, fontSize: 12),
+                    style: TextStyle(color: context.lc.inkMuted, fontSize: 12),
                   ),
                 ],
               ),
@@ -884,8 +897,8 @@ class _CastingConfirmation extends StatelessWidget {
                 (index) => Chip(
                   key: Key('confirm-line-${index + 1}'),
                   label: Text('${index + 1} · ${values[index]}'),
-                  backgroundColor: _paper,
-                  side: const BorderSide(color: _rule),
+                  backgroundColor: context.lc.paperRaised,
+                  side: BorderSide(color: context.lc.inkFaint),
                 ),
               ),
             ),
@@ -904,7 +917,7 @@ class _CastingConfirmation extends StatelessWidget {
                     key: const Key('confirm-manual-cast'),
                     onPressed: () => Navigator.pop(context, true),
                     style: FilledButton.styleFrom(
-                      backgroundColor: LiuyaoColors.cinnabar,
+                      backgroundColor: context.lc.cinnabar,
                     ),
                     child: const Text('确认并排盘'),
                   ),
@@ -931,12 +944,12 @@ class _InlineError extends StatelessWidget {
       key: const Key('casting-error'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: DSColors.glowCinnabar,
+        color: context.ds.glowCinnabar,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: _cinnabar, size: 20),
+          Icon(Icons.error_outline, color: context.lc.cinnabar, size: 20),
           const SizedBox(width: 8),
           Expanded(child: Text(message)),
         ],
@@ -963,9 +976,9 @@ class _ManualPillarsEditor extends StatelessWidget {
       key: const Key('manual-four-pillars-editor'),
       padding: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
-        color: _softPaper,
+        color: context.lc.parchment,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _rule, width: .8),
+        border: Border.all(color: context.lc.inkFaint, width: .8),
       ),
       child: Column(
         children: labels
@@ -1114,7 +1127,7 @@ class _PillarDropdown<T> extends StatelessWidget {
         ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
-      style: const TextStyle(color: _ink, fontSize: 14),
+      style: TextStyle(color: context.lc.ink, fontSize: 14),
       items: values
           .map((item) => DropdownMenuItem<T>(value: item, child: Text('$item')))
           .toList(growable: false),
