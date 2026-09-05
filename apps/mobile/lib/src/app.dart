@@ -14,7 +14,7 @@ import 'ui/design_system/components/ds_bottom_navigation.dart';
 import 'ui/design_system/components/liuyao_icon.dart';
 import 'ui/liuyao_design.dart';
 
-class LiuyaoArchiveApp extends StatelessWidget {
+class LiuyaoArchiveApp extends StatefulWidget {
   const LiuyaoArchiveApp({
     super.key,
     this.almanacDataSource,
@@ -25,11 +25,43 @@ class LiuyaoArchiveApp extends StatelessWidget {
   final CastingDataSource? castingDataSource;
 
   @override
+  State<LiuyaoArchiveApp> createState() => _LiuyaoArchiveAppState();
+}
+
+class _LiuyaoArchiveAppState extends State<LiuyaoArchiveApp> {
+  @override
+  void initState() {
+    super.initState();
+    // 启动即加载偏好（幂等）；加载完成后经 preferencesNotifier 触发重建。
+    loadPreferences();
+    preferencesNotifier.addListener(_onPreferencesChanged);
+  }
+
+  @override
+  void dispose() {
+    preferencesNotifier.removeListener(_onPreferencesChanged);
+    super.dispose();
+  }
+
+  void _onPreferencesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  ThemeMode _resolveThemeMode(AppThemeMode mode) => switch (mode) {
+    AppThemeMode.auto => ThemeMode.system,
+    AppThemeMode.light => ThemeMode.light,
+    AppThemeMode.dark => ThemeMode.dark,
+  };
+
+  @override
   Widget build(BuildContext context) {
+    final prefs = preferencesNotifier.value;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: '道谕六爻',
       theme: buildLiuyaoTheme(),
+      darkTheme: buildLiuyaoDarkTheme(),
+      themeMode: _resolveThemeMode(prefs.themeMode),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -37,13 +69,18 @@ class LiuyaoArchiveApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('zh', 'CN'), Locale('en')],
       locale: const Locale('zh', 'CN'),
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.dark,
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: isDark
+              ? SystemUiOverlayStyle.light
+              : SystemUiOverlayStyle.dark,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: HomeShell(
-        almanacDataSource: almanacDataSource,
-        castingDataSource: castingDataSource,
+        almanacDataSource: widget.almanacDataSource,
+        castingDataSource: widget.castingDataSource,
       ),
     );
   }
@@ -81,8 +118,6 @@ class _HomeShellState extends State<HomeShell> {
       null,
       null,
     ];
-    // 启动即加载偏好（幂等）；首次进入六爻前完成口径确认。
-    loadPreferences();
   }
 
   void _onAlmanacDateSelected(DateTime date) {
