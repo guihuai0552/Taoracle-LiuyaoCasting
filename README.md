@@ -63,16 +63,20 @@ flutter run
 
 ### 构建 Release APK
 
+发布安装包统一使用 arm64 split 构建（约 24MB；**不要**用默认 fat 包——fat 包不含 split 偏移的 versionCode 会低于已发布的 split 包，导致真机「降级」无法覆盖安装，见 change-log 第二十一批「v1.18.2 发布口径修正」）：
+
 ```bash
 cd apps/mobile
-flutter build apk --release
+flutter build apk --release --target-platform android-arm64 --split-per-abi
+# 产物：build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+# versionName 为 pubspec 版本，versionCode = 2000 + build number（arm64 split 偏移）
 ```
 
 发布 APK 必须通过断网门禁检查（校验无网络权限、无远程调用）：
 
 ```bash
 python3 scripts/check_offline_mobile_release.py \
-  --apk apps/mobile/build/app/outputs/flutter-apk/app-release.apk
+  --apk apps/mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
 
 ##  测试与验证
