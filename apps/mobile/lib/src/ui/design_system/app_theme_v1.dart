@@ -5,6 +5,7 @@ import 'tokens/ds_colors.dart';
 import 'tokens/ds_colors_v1.dart';
 import 'tokens/ds_radius.dart';
 import 'tokens/ds_spacing.dart';
+import 'tokens/ds_theme_extension.dart';
 import 'tokens/ds_typography.dart';
 
 /// 构建「Quiet Intelligence / 静默智能」主题（v1.0 · 浅色默认）。
@@ -346,138 +347,157 @@ class DSQuietBackgroundNight extends StatelessWidget {
 ///
 /// 与 Nocturne 暗色的差异集中在色板与信号强调；字体、圆角、间距、组件
 /// 结构与 v1.0 设计系统保持一致（标题细体、等宽元数据、发丝线分隔）。
-ThemeData buildDaoyuTheme() {
-  final base = ThemeData.light(useMaterial3: true);
-  final colors = ColorScheme.light(
-    primary: DSColors.celadon,
-    onPrimary: DSColors.moonWhite,
-    primaryContainer: DSColors.glowCeladon,
-    onPrimaryContainer: DSColors.celadonDeep,
-    secondary: DSColors.jade,
-    onSecondary: DSColors.moonWhite,
-    secondaryContainer: DSColors.glowJade,
-    onSecondaryContainer: DSColors.celadonDeep,
-    error: DSColors.cinnabar,
-    onError: DSColors.moonWhite,
-    surface: DSColors.surfaceRaised,
-    onSurface: DSColors.textPrimary,
-    surfaceContainerHighest: DSColors.surfaceLightSunken,
-    outline: DSColors.hairlineStrong,
-    outlineVariant: DSColors.hairline,
-    shadow: Colors.black,
-  );
+ThemeData buildDaoyuTheme() => _buildDaoyuTheme(
+  scheme: DSColorsScheme.light,
+  brightness: Brightness.light,
+);
+
+ThemeData buildDaoyuDarkTheme() =>
+    _buildDaoyuTheme(scheme: DSColorsScheme.dark, brightness: Brightness.dark);
+
+ThemeData _buildDaoyuTheme({
+  required DSColorsScheme scheme,
+  required Brightness brightness,
+}) {
+  final base = brightness == Brightness.dark
+      ? ThemeData.dark(useMaterial3: true)
+      : ThemeData.light(useMaterial3: true);
+  final onContainer = brightness == Brightness.dark
+      ? scheme.background
+      : scheme.moonWhite;
+  final colors =
+      (brightness == Brightness.dark ? ColorScheme.dark : ColorScheme.light)(
+        primary: scheme.celadon,
+        onPrimary: onContainer,
+        primaryContainer: scheme.glowCeladon,
+        onPrimaryContainer: scheme.celadonDeep,
+        secondary: scheme.jade,
+        onSecondary: onContainer,
+        secondaryContainer: scheme.glowJade,
+        onSecondaryContainer: scheme.celadonDeep,
+        error: scheme.cinnabar,
+        onError: onContainer,
+        surface: scheme.surfaceRaised,
+        onSurface: scheme.textPrimary,
+        surfaceContainerHighest: scheme.surfaceLightSunken,
+        outline: scheme.hairlineStrong,
+        outlineVariant: scheme.hairline,
+        shadow: Colors.black,
+      );
 
   final bodyTheme = base.textTheme.apply(
-    bodyColor: DSColors.textPrimary,
-    displayColor: DSColors.textPrimary,
+    bodyColor: scheme.textPrimary,
+    displayColor: scheme.textPrimary,
     fontFamilyFallback: DSTypography.sansFallback,
   );
 
   return base.copyWith(
     colorScheme: colors,
-    scaffoldBackgroundColor: DSColors.background,
-    canvasColor: DSColors.background,
-    dividerColor: DSColors.hairlineStrong,
+    scaffoldBackgroundColor: scheme.background,
+    canvasColor: scheme.background,
+    dividerColor: scheme.hairlineStrong,
     textTheme: bodyTheme.copyWith(
       displayLarge: DSTypography.displayLight(
         fontSize: 32,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.2,
       ),
       displayMedium: DSTypography.displayLight(
         fontSize: 28,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.2,
       ),
       displaySmall: DSTypography.displayLight(
         fontSize: 24,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.3,
       ),
       headlineLarge: DSTypography.displayLight(
         fontSize: 24,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.3,
       ),
       headlineMedium: DSTypography.displayLight(
         fontSize: 20,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.4,
       ),
       headlineSmall: DSTypography.displayLight(
         fontSize: 18,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.4,
       ),
       titleLarge: DSTypography.body(
         fontSize: 18,
         weight: FontWeight.w400,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.4,
       ),
       titleMedium: DSTypography.body(
         fontSize: 16,
         weight: FontWeight.w500,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
       ),
       titleSmall: DSTypography.body(
         fontSize: 14,
         weight: FontWeight.w500,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
       ),
       bodyLarge: DSTypography.body(
         fontSize: 14,
         weight: FontWeight.w400,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.6,
       ),
       bodyMedium: DSTypography.body(
         fontSize: 14,
         weight: FontWeight.w400,
-        color: DSColors.textSecondary,
+        color: scheme.textSecondary,
         height: 1.6,
       ),
       bodySmall: DSTypography.body(
         fontSize: 12,
         weight: FontWeight.w400,
-        color: DSColors.textMuted,
+        color: scheme.textMuted,
         height: 1.5,
       ),
       labelLarge: DSTypography.overline(
-        color: DSColors.textSecondary,
+        color: scheme.textSecondary,
         fontSize: 11,
       ),
-      labelMedium: DSTypography.overline(color: DSColors.textMuted),
-      labelSmall: DSTypography.overline(color: DSColors.textFaint, fontSize: 9),
+      labelMedium: DSTypography.overline(color: scheme.textMuted),
+      labelSmall: DSTypography.overline(color: scheme.textFaint, fontSize: 9),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
-      foregroundColor: DSColors.textPrimary,
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
+      foregroundColor: scheme.textPrimary,
+      systemOverlayStyle: brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
       titleTextStyle: DSTypography.displayLight(
         fontSize: 20,
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         height: 1.3,
       ),
     ),
     cardTheme: CardThemeData(
-      color: DSColors.surfaceRaised,
+      color: scheme.surfaceRaised,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DSRadius.lg),
-        side: BorderSide(color: DSColors.hairlineStrong, width: .8),
+        side: BorderSide(color: scheme.hairlineStrong, width: .8),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: DSColors.celadon,
-        foregroundColor: DSColors.moonWhite,
-        disabledBackgroundColor: DSColors.textFaint,
-        disabledForegroundColor: DSColors.surfaceRaised,
+        backgroundColor: scheme.celadon,
+        foregroundColor: onContainer,
+        disabledBackgroundColor: scheme.textFaint,
+        disabledForegroundColor: scheme.surfaceRaised,
         minimumSize: const Size(48, 48),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DSRadius.sm),
@@ -490,9 +510,9 @@ ThemeData buildDaoyuTheme() {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: DSColors.textPrimary,
+        foregroundColor: scheme.textPrimary,
         minimumSize: const Size(48, 48),
-        side: BorderSide(color: DSColors.hairlineStrong, width: 1),
+        side: BorderSide(color: scheme.hairlineStrong, width: 1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DSRadius.sm),
         ),
@@ -501,51 +521,51 @@ ThemeData buildDaoyuTheme() {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: DSColors.celadonDeep,
+        foregroundColor: scheme.celadonDeep,
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: DSColors.surfaceLightSunken,
-      hintStyle: TextStyle(color: DSColors.textFaint),
-      labelStyle: TextStyle(color: DSColors.textSecondary),
+      fillColor: scheme.surfaceLightSunken,
+      hintStyle: TextStyle(color: scheme.textFaint),
+      labelStyle: TextStyle(color: scheme.textSecondary),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: DSSpacing.lg,
         vertical: DSSpacing.md,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(DSRadius.md),
-        borderSide: BorderSide(color: DSColors.hairlineStrong),
+        borderSide: BorderSide(color: scheme.hairlineStrong),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(DSRadius.md),
-        borderSide: BorderSide(color: DSColors.hairlineStrong),
+        borderSide: BorderSide(color: scheme.hairlineStrong),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(DSRadius.md),
-        borderSide: BorderSide(color: DSColors.celadon, width: 1.2),
+        borderSide: BorderSide(color: scheme.celadon, width: 1.2),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: DSColors.glassStrong,
+      backgroundColor: scheme.glassStrong,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: DSColors.glowCinnabar,
+      indicatorColor: scheme.glowCinnabar,
       elevation: 0,
       height: 70,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
           color: states.contains(WidgetState.selected)
-              ? DSColors.celadonDeep
-              : DSColors.textMuted,
+              ? scheme.celadonDeep
+              : scheme.textMuted,
         ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           color: states.contains(WidgetState.selected)
-              ? DSColors.celadonDeep
-              : DSColors.textMuted,
+              ? scheme.celadonDeep
+              : scheme.textMuted,
           fontSize: 11,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w600
@@ -554,11 +574,11 @@ ThemeData buildDaoyuTheme() {
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: DSColors.glassStrong,
+      backgroundColor: scheme.glassStrong,
       surfaceTintColor: Colors.transparent,
-      modalBackgroundColor: DSColors.glassStrong,
+      modalBackgroundColor: scheme.glassStrong,
       showDragHandle: true,
-      dragHandleColor: DSColors.textMuted,
+      dragHandleColor: scheme.textMuted,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(DSRadius.sheetTop),
@@ -566,29 +586,29 @@ ThemeData buildDaoyuTheme() {
       ),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: DSColors.glassStrong,
+      backgroundColor: scheme.glassStrong,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DSRadius.sheetTop),
-        side: BorderSide(color: DSColors.hairlineStrong, width: .8),
+        side: BorderSide(color: scheme.hairlineStrong, width: .8),
       ),
     ),
     dividerTheme: DividerThemeData(
-      color: DSColors.hairlineStrong,
+      color: scheme.hairlineStrong,
       thickness: .8,
       space: 1,
     ),
     chipTheme: base.chipTheme.copyWith(
-      backgroundColor: DSColors.surfaceLightSunken,
-      selectedColor: DSColors.glowCinnabar,
-      side: BorderSide(color: DSColors.hairlineStrong, width: .8),
-      labelStyle: TextStyle(color: DSColors.textPrimary, fontSize: 12),
+      backgroundColor: scheme.surfaceLightSunken,
+      selectedColor: scheme.glowCinnabar,
+      side: BorderSide(color: scheme.hairlineStrong, width: .8),
+      labelStyle: TextStyle(color: scheme.textPrimary, fontSize: 12),
       secondaryLabelStyle: TextStyle(
-        color: DSColors.moonWhite,
+        color: onContainer,
         fontSize: 12,
         fontWeight: FontWeight.w600,
       ),
-      checkmarkColor: DSColors.celadonDeep,
+      checkmarkColor: scheme.celadonDeep,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DSRadius.sm),
       ),
@@ -596,31 +616,32 @@ ThemeData buildDaoyuTheme() {
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? DSColors.celadonDeep
-            : DSColors.textMuted,
+            ? scheme.celadonDeep
+            : scheme.textMuted,
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? DSColors.celadonDim.withValues(alpha: .7)
-            : DSColors.surfaceLightSunken,
+            ? scheme.celadonDim.withValues(alpha: .7)
+            : scheme.surfaceLightSunken,
       ),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: DSColors.celadon,
-      linearTrackColor: DSColors.surfaceLightSunken,
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: scheme.celadon,
+      linearTrackColor: scheme.surfaceLightSunken,
     ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
-        color: DSColors.textPrimary,
+        color: scheme.textPrimary,
         borderRadius: BorderRadius.circular(DSRadius.sm),
       ),
-      textStyle: const TextStyle(color: DSColors.moonWhite, fontSize: 11),
+      textStyle: TextStyle(color: onContainer, fontSize: 11),
     ),
+    extensions: [scheme],
   );
 }
 
-/// 道谕浅色底：纯暖白，无渐变、无装饰——让卦面内容成为唯一主角。
+/// 道谕底：跟随当前主题切换，无渐变、无装饰——让卦面内容成为唯一主角。
 class DSDaoyuBackground extends StatelessWidget {
   const DSDaoyuBackground({super.key, required this.child});
 
@@ -628,5 +649,5 @@ class DSDaoyuBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      ColoredBox(color: DSColors.background, child: child);
+      ColoredBox(color: context.ds.background, child: child);
 }
