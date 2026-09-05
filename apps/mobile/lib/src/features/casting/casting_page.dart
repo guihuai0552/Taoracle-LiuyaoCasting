@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../ui/design_system/components/daoyu_brand_title.dart';
 import '../../ui/design_system/components/ds_segmented_control.dart';
-import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_theme_extension.dart';
 import '../../ui/design_system/tokens/ds_typography.dart';
 import 'automatic_casting_page.dart';
 import 'casting_client.dart';
@@ -73,7 +73,7 @@ class _CastingPageState extends State<CastingPage> {
                           '起卦台 · 问题 · 时间 · 摇卦',
                           style: DSTypography.body(
                             fontSize: 12,
-                            color: DSColors.textMuted,
+                            color: context.ds.textMuted,
                           ),
                         ),
                       ],
