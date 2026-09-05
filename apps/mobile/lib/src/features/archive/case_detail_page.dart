@@ -501,12 +501,15 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
     if (boundaryContext == null) return;
     setState(() => _magnifying = true);
     try {
-      final boundary =
-          boundaryContext.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null || boundary.debugNeedsPaint) {
-        // 首帧未绘制完成时等一帧再截，保证内容完整。
-        await WidgetsBinding.instance.endOfFrame;
-      }
+      // 无条件等当前帧绘制完成再截图：倍数面板关闭与 setState 之后的
+      // 首帧可能尚未 paint（layer 未就绪）。
+      // 注意不可用 RenderObject 的 debugNeeds* 系列 getter 做「是否需要
+      // 等」的判断：它们在 assert 里给 late 局部变量赋值，release 构建
+      // 剥离 assert 后读取必抛 LateInitializationError（v1.18.1 用户
+      // 反馈的「放大视图生成失败」报错正是它）。静态守护测试见
+      // widget_test.dart「production sources never read debug-only
+      // render getters」。
+      await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
       final resolved =
           _magnifierBoundaryKey.currentContext?.findRenderObject()

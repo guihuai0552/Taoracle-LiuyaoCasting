@@ -2303,6 +2303,25 @@ void main() {
     expect(gaze().dy, closeTo(center.dy, 0.5));
   });
 
+  test('production sources never read debug-only render getters', () {
+    // v1.18.1 用户反馈「放大视图生成失败(LateInitializationError: Local
+    // 'result' has not been initialized)」：RenderObject.debugNeedsPaint
+    // 等 getter 在 assert 内给 late 局部变量赋值，release 构建剥离
+    // assert 后读取必抛。debug 模式的 widget 测试无法复现 release
+    // 行为，只能以静态守护防止再次引入。
+    final banned = RegExp(
+      'debugNeedsPaint|debugNeedsLayout|debugNeedsCompositedLayerUpdate',
+    );
+    final violations = <String>[];
+    for (final entity in Directory('lib').listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      if (entity.readAsStringSync().contains(banned)) {
+        violations.add(entity.path);
+      }
+    }
+    expect(violations, isEmpty, reason: 'production 代码禁止读取 debug-only getter');
+  });
+
   testWidgets('settings font choices persist and notify ui font', (
     tester,
   ) async {
