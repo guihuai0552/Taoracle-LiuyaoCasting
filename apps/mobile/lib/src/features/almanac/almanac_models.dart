@@ -131,9 +131,10 @@ class AlmanacSnapshot {
     final solarTerms = engineResult['solar_terms'] as Map<String, dynamic>?;
     final providerExtensions =
         engineResult['provider_extensions'] as Map<String, dynamic>?;
-    final mansion = (providerExtensions?['twenty_eight_mansion']
-            as Map<String, dynamic>?)
-        ?['name'] as String?;
+    final mansion =
+        (providerExtensions?['twenty_eight_mansion']
+                as Map<String, dynamic>?)?['name']
+            as String?;
 
     return AlmanacSnapshot(
       solarDate: DateTime(timestamp.year, timestamp.month, timestamp.day),
