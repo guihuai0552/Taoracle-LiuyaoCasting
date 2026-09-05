@@ -23,4 +23,5 @@ export 'tokens/ds_opacity.dart';
 export 'tokens/ds_radius.dart';
 export 'tokens/ds_shadow.dart';
 export 'tokens/ds_spacing.dart';
+export 'tokens/ds_theme_extension.dart';
 export 'tokens/ds_typography.dart';
