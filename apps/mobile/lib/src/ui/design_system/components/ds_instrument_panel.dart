@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../tokens/ds_colors.dart';
 import '../tokens/ds_opacity.dart';
 import '../tokens/ds_radius.dart';
 import '../tokens/ds_shadow.dart';
 import '../tokens/ds_spacing.dart';
+import '../tokens/ds_theme_extension.dart';
 
-/// 仪器面板：顶部状态栏式标题 + 细网格/刻度装饰 + 内容区。
-///
-/// 用于承载关键术数信息：本卦/变卦、六爻、六亲/六神、世应、用神提示。
-/// 只做展示容器，不承载业务判断。
 class DSInstrumentPanel extends StatelessWidget {
   const DSInstrumentPanel({
     super.key,
@@ -41,11 +37,12 @@ class DSInstrumentPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ds = context.ds;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: DSColors.glass,
+        color: ds.glass,
         borderRadius: BorderRadius.circular(DSRadius.lg),
-        border: Border.all(color: DSColors.metalLine, width: 1),
+        border: Border.all(color: ds.metalLine, width: 1),
         boxShadow: glow,
       ),
       child: ClipRRect(
@@ -54,7 +51,7 @@ class DSInstrumentPanel extends StatelessWidget {
           children: [
             if (showGrid)
               Positioned.fill(
-                child: CustomPaint(painter: const _InstrumentGridPainter()),
+                child: CustomPaint(painter: _InstrumentGridPainter(ds: ds)),
               ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,10 +62,10 @@ class DSInstrumentPanel extends StatelessWidget {
                   child: Row(
                     children: [
                       if (headerIcon != null) ...[
-                        Icon(headerIcon, size: 15, color: DSColors.celadonDeep),
+                        Icon(headerIcon, size: 15, color: ds.celadonDeep),
                         const SizedBox(width: DSSpacing.xs),
                       ],
-                      const _StatusDot(),
+                      _StatusDot(ds: ds),
                       const SizedBox(width: DSSpacing.xs),
                       Expanded(
                         child: Column(
@@ -76,8 +73,8 @@ class DSInstrumentPanel extends StatelessWidget {
                           children: [
                             Text(
                               title,
-                              style: const TextStyle(
-                                color: DSColors.textPrimary,
+                              style: TextStyle(
+                                color: ds.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: .3,
@@ -86,8 +83,8 @@ class DSInstrumentPanel extends StatelessWidget {
                             if (subtitle != null)
                               Text(
                                 subtitle!,
-                                style: const TextStyle(
-                                  color: DSColors.textMuted,
+                                style: TextStyle(
+                                  color: ds.textMuted,
                                   fontSize: 9,
                                   height: 1.3,
                                 ),
@@ -102,7 +99,7 @@ class DSInstrumentPanel extends StatelessWidget {
                 Divider(
                   height: 1,
                   thickness: .8,
-                  color: DSColors.metalLine.withValues(alpha: .8),
+                  color: ds.metalLine.withValues(alpha: .8),
                   indent: DSSpacing.lg,
                   endIndent: DSSpacing.lg,
                 ),
@@ -116,31 +113,30 @@ class DSInstrumentPanel extends StatelessWidget {
   }
 }
 
-/// 顶部状态灯：青铜小圆点，模拟仪器通电指示。
 class _StatusDot extends StatelessWidget {
-  const _StatusDot();
+  const _StatusDot({required this.ds});
+
+  final DSColorsScheme ds;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 6,
       height: 6,
-      decoration: BoxDecoration(
-        color: DSColors.celadonDeep,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: ds.celadonDeep, shape: BoxShape.circle),
     );
   }
 }
 
-/// 仪器网格：极淡网格 + 中心十字刻度，装饰面板内部。
 class _InstrumentGridPainter extends CustomPainter {
-  const _InstrumentGridPainter();
+  const _InstrumentGridPainter({required this.ds});
+
+  final DSColorsScheme ds;
 
   @override
   void paint(Canvas canvas, Size size) {
     final gridPaint = Paint()
-      ..color = DSColors.moonWhite.withValues(alpha: DSOpacity.faint)
+      ..color = ds.moonWhite.withValues(alpha: DSOpacity.faint)
       ..style = PaintingStyle.stroke
       ..strokeWidth = .5;
     const unit = 24.0;
@@ -156,7 +152,7 @@ class _InstrumentGridPainter extends CustomPainter {
     canvas.drawPath(path, gridPaint);
 
     final crossPaint = Paint()
-      ..color = DSColors.celadon.withValues(alpha: .16)
+      ..color = ds.celadon.withValues(alpha: .16)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     final cross = Path()
@@ -168,5 +164,6 @@ class _InstrumentGridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _InstrumentGridPainter oldDelegate) =>
+      oldDelegate.ds != ds;
 }
