@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../tokens/ds_colors.dart';
 import '../tokens/ds_radius.dart';
 import '../tokens/ds_shadow.dart';
 import '../tokens/ds_spacing.dart';
+import '../tokens/ds_theme_extension.dart';
 
-/// 按钮分级：主操作 / 次级 / 幽灵 / 仪式。
 enum DSButtonVariant { primary, secondary, ghost, ritual }
 
-/// 现代东方术数仪器 · 按钮。
-///
-/// - [DSButtonVariant.primary]：开始起卦、生成解读等主操作。
-/// - [DSButtonVariant.secondary]：查看详情、保存等次级操作。
-/// - [DSButtonVariant.ghost]：返回、更多等轻操作。
-/// - [DSButtonVariant.ritual]：摇卦、重新起卦等仪式性动作（青铜辉光 + 刻线）。
 class DSButton extends StatelessWidget {
   const DSButton({
     super.key,
@@ -36,29 +29,27 @@ class DSButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ds = context.ds;
     final background = switch (variant) {
-      DSButtonVariant.primary => DSColors.celadon,
-      DSButtonVariant.secondary => DSColors.glassWeak,
+      DSButtonVariant.primary => ds.celadon,
+      DSButtonVariant.secondary => ds.glassWeak,
       DSButtonVariant.ghost => Colors.transparent,
-      DSButtonVariant.ritual => DSColors.glass,
+      DSButtonVariant.ritual => ds.glass,
     };
     final foreground = switch (variant) {
-      DSButtonVariant.primary => DSColors.background,
-      DSButtonVariant.secondary => DSColors.textPrimary,
-      DSButtonVariant.ghost => DSColors.textSecondary,
-      DSButtonVariant.ritual => DSColors.celadonDeep,
+      DSButtonVariant.primary => ds.background,
+      DSButtonVariant.secondary => ds.textPrimary,
+      DSButtonVariant.ghost => ds.textSecondary,
+      DSButtonVariant.ritual => ds.celadonDeep,
     };
     final border = switch (variant) {
       DSButtonVariant.primary => Border.all(
         color: Colors.transparent,
         width: 0,
       ),
-      DSButtonVariant.secondary => Border.all(
-        color: DSColors.metalLine,
-        width: 1,
-      ),
+      DSButtonVariant.secondary => Border.all(color: ds.metalLine, width: 1),
       DSButtonVariant.ghost => Border.all(color: Colors.transparent, width: 0),
-      DSButtonVariant.ritual => Border.all(color: DSColors.metalLine, width: 1),
+      DSButtonVariant.ritual => Border.all(color: ds.metalLine, width: 1),
     };
     final shadow = switch (variant) {
       DSButtonVariant.ritual => DSShadow.glowCeladon,
