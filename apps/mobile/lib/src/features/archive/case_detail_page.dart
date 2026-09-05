@@ -15,12 +15,6 @@ import 'archive_client.dart';
 import 'archive_image_export.dart';
 import 'archive_models.dart';
 
-const _mutedInk = LiuyaoColors.inkMuted;
-const _cinnabar = LiuyaoColors.cinnabar;
-const _paper = LiuyaoColors.paperRaised;
-const _softPaper = LiuyaoColors.parchment;
-const _rule = LiuyaoColors.inkFaint;
-
 class CaseDetailPage extends StatefulWidget {
   const CaseDetailPage({
     required this.client,
@@ -111,9 +105,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
           ),
           FilledButton(
             key: const Key('case-delete-confirm'),
-            style: FilledButton.styleFrom(
-              backgroundColor: LiuyaoColors.cinnabar,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: context.lc.cinnabar),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('删除'),
           ),
@@ -187,7 +179,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
           TextButton(
             key: const Key('delete-analysis-confirm'),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('删除', style: TextStyle(color: _cinnabar)),
+            child: Text('删除', style: TextStyle(color: context.lc.cinnabar)),
           ),
         ],
       ),
@@ -216,7 +208,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (sheetContext) => _TextSheetEditor(
         title: '编辑占问',
         note: '修改占问内容不会改动卦面、四柱与起卦时间；更详细的补充请用「编辑背景问念」。',
@@ -249,7 +241,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (sheetContext) => _TextSheetEditor(
         title: '编辑背景问念',
         note: '可在起卦后补充背景，不会修改原卦、四柱或起卦时间。',
@@ -298,7 +290,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (_) => _TagsEditor(initialTags: tags, suggestions: suggestions),
     );
     if (result == null || !mounted) return;
@@ -320,7 +312,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (_) => _FeedbackEditor(existing: existing),
     );
     if (draft == null || !mounted) return;
@@ -401,7 +393,7 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -514,11 +506,14 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
         ),
         actions: [
           if (widget.openedAfterCasting)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(right: 2),
               child: Tooltip(
                 message: '已自动存档',
-                child: Icon(Icons.cloud_done_outlined, color: _cinnabar),
+                child: Icon(
+                  Icons.cloud_done_outlined,
+                  color: context.lc.cinnabar,
+                ),
               ),
             ),
           IconButton(
@@ -723,8 +718,8 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             child: Text(
               '— 仅供娱乐 —',
               key: const Key('case-entertainment-note'),
-              style: const TextStyle(
-                color: _mutedInk,
+              style: TextStyle(
+                color: context.lc.inkMuted,
                 fontSize: 12,
                 letterSpacing: 2,
               ),
@@ -736,10 +731,13 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
             Container(
               padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
-                color: DSColors.glowCinnabar,
+                color: context.ds.glowCinnabar,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Text(_error!, style: const TextStyle(color: _cinnabar)),
+              child: Text(
+                _error!,
+                style: TextStyle(color: context.lc.cinnabar),
+              ),
             ),
           ],
         ],
@@ -839,9 +837,9 @@ class _ExportSheetState extends State<_ExportSheet> {
         style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
       ),
       const SizedBox(height: 6),
-      const Text(
+      Text(
         '文件包含占问、原始起卦、卦面快照、解读、反馈和计算依据。',
-        style: TextStyle(color: _mutedInk, height: 1.45),
+        style: TextStyle(color: context.lc.inkMuted, height: 1.45),
       ),
       const SizedBox(height: 14),
       _ExportOptionRow(
@@ -891,15 +889,15 @@ class _ExportSheetState extends State<_ExportSheet> {
         width: double.infinity,
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: _softPaper.withValues(alpha: .62),
+          color: context.lc.parchment.withValues(alpha: .62),
           borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-          border: Border.all(color: _rule),
+          border: Border.all(color: context.lc.inkFaint),
         ),
         child: Text(
           _includeRecords
               ? '将包含：占问 · 起卦时间 · 本卦与变卦 · 六亲六神 · 伏神 · 计算依据 · 解读${_includeHistory ? '（全部版本）' : '（最新一版）'} · 反馈'
               : '将包含：占问 · 起卦时间 · 本卦与变卦 · 六亲六神 · 伏神',
-          style: const TextStyle(color: _mutedInk, height: 1.55),
+          style: TextStyle(color: context.lc.inkMuted, height: 1.55),
         ),
       ),
     ],
@@ -926,10 +924,10 @@ class _ExportOptionRow extends StatelessWidget {
   Widget build(BuildContext context) => Opacity(
     opacity: enabled ? 1 : .55,
     child: Material(
-      color: _softPaper.withValues(alpha: .45),
+      color: context.lc.parchment.withValues(alpha: .45),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-        side: const BorderSide(color: _rule),
+        side: BorderSide(color: context.lc.inkFaint),
       ),
       child: InkWell(
         // 整行可点切换（与设置页开关行为一致）。
@@ -950,7 +948,10 @@ class _ExportOptionRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       description,
-                      style: const TextStyle(color: _mutedInk, fontSize: 12.5),
+                      style: TextStyle(
+                        color: context.lc.inkMuted,
+                        fontSize: 12.5,
+                      ),
                     ),
                   ],
                 ),
@@ -1026,7 +1027,7 @@ class _TextSheetEditorState extends State<_TextSheetEditor> {
         const SizedBox(height: 8),
         Text(
           widget.note,
-          style: const TextStyle(color: _mutedInk, height: 1.4),
+          style: TextStyle(color: context.lc.inkMuted, height: 1.4),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -1080,10 +1081,10 @@ class _ExportChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _softPaper.withValues(alpha: .45),
+      color: context.lc.parchment.withValues(alpha: .45),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        side: const BorderSide(color: _rule),
+        side: BorderSide(color: context.lc.inkFaint),
       ),
       child: InkWell(
         onTap: onTap,
@@ -1096,11 +1097,11 @@ class _ExportChoice extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: _paper,
+                  color: context.lc.paperRaised,
                   borderRadius: BorderRadius.circular(LiuyaoRadii.small),
-                  border: Border.all(color: _rule),
+                  border: Border.all(color: context.lc.inkFaint),
                 ),
-                child: Icon(icon, color: _cinnabar),
+                child: Icon(icon, color: context.lc.cinnabar),
               ),
               const SizedBox(width: 13),
               Expanded(
@@ -1114,12 +1115,15 @@ class _ExportChoice extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       description,
-                      style: const TextStyle(color: _mutedInk, fontSize: 13),
+                      style: TextStyle(
+                        color: context.lc.inkMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: _mutedInk),
+              Icon(Icons.chevron_right_rounded, color: context.lc.inkMuted),
             ],
           ),
         ),
@@ -1148,9 +1152,9 @@ class _QuestionCard extends StatelessWidget {
     // 不再单独占层，schema 版本仅保留在导出与持久化数据中。
     padding: const EdgeInsets.fromLTRB(9, 4, 5, 4),
     decoration: BoxDecoration(
-      color: _paper,
+      color: context.lc.paperRaised,
       borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-      border: Border.all(color: _rule, width: .8),
+      border: Border.all(color: context.lc.inkFaint, width: .8),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1180,8 +1184,8 @@ class _QuestionCard extends StatelessWidget {
                 'time_pillar' => '时刻起卦',
                 _ => '自动铜钱',
               },
-              style: const TextStyle(
-                color: _cinnabar,
+              style: TextStyle(
+                color: context.lc.cinnabar,
                 fontSize: 8.5,
                 fontWeight: FontWeight.w600,
               ),
@@ -1194,7 +1198,7 @@ class _QuestionCard extends StatelessWidget {
               constraints: const BoxConstraints.tightFor(width: 20, height: 20),
               padding: EdgeInsets.zero,
               iconSize: 13,
-              icon: const Icon(Icons.sell_outlined, color: _cinnabar),
+              icon: Icon(Icons.sell_outlined, color: context.lc.cinnabar),
             ),
             IconButton(
               key: const Key('edit-question-context'),
@@ -1204,7 +1208,7 @@ class _QuestionCard extends StatelessWidget {
               constraints: const BoxConstraints.tightFor(width: 20, height: 20),
               padding: EdgeInsets.zero,
               iconSize: 14,
-              icon: const Icon(Icons.edit_note_outlined, color: _cinnabar),
+              icon: Icon(Icons.edit_note_outlined, color: context.lc.cinnabar),
             ),
           ],
         ),
@@ -1225,8 +1229,8 @@ class _QuestionCard extends StatelessWidget {
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: LiuyaoColors.ink,
+                style: TextStyle(
+                  color: context.lc.ink,
                   fontSize: 12,
                   height: 1.18,
                   fontWeight: FontWeight.w600,
@@ -1246,9 +1250,9 @@ class _QuestionCard extends StatelessWidget {
                 ),
                 padding: EdgeInsets.zero,
                 iconSize: 14,
-                icon: const Icon(
+                icon: Icon(
                   Icons.drive_file_rename_outline,
-                  color: _cinnabar,
+                  color: context.lc.cinnabar,
                 ),
               ),
             ],
@@ -1266,8 +1270,8 @@ class _QuestionCard extends StatelessWidget {
                     '背景问念：${detail.questionContext}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _mutedInk,
+                    style: TextStyle(
+                      color: context.lc.inkMuted,
                       fontSize: 9,
                       height: 1.15,
                     ),
@@ -1294,16 +1298,18 @@ class _QuestionCard extends StatelessWidget {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: _cinnabar.withValues(alpha: .08),
+                              color: context.lc.cinnabar.withValues(alpha: .08),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: _cinnabar.withValues(alpha: .28),
+                                color: context.lc.cinnabar.withValues(
+                                  alpha: .28,
+                                ),
                               ),
                             ),
                             child: Text(
                               tag,
-                              style: const TextStyle(
-                                color: _cinnabar,
+                              style: TextStyle(
+                                color: context.lc.cinnabar,
                                 fontSize: 9,
                                 height: 1.15,
                                 fontWeight: FontWeight.w700,
@@ -1337,19 +1343,19 @@ class _AutoArchiveBanner extends StatelessWidget {
     key: const Key('auto-archive-banner'),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
     decoration: BoxDecoration(
-      color: DSColors.glowJade,
+      color: context.ds.glowJade,
       borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: DSColors.jade.withValues(alpha: .3)),
+      border: Border.all(color: context.ds.jade.withValues(alpha: .3)),
     ),
-    child: const Row(
+    child: Row(
       children: [
-        Icon(Icons.inventory_2_outlined, size: 18, color: DSColors.jade),
+        Icon(Icons.inventory_2_outlined, size: 18, color: context.ds.jade),
         SizedBox(width: 8),
         Expanded(
           child: Text(
             '排盘完成，当前原始起卦与完整卦面已自动存入档案',
             style: TextStyle(
-              color: DSColors.jade,
+              color: context.ds.jade,
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -1377,7 +1383,7 @@ class _ResultExpansionCard extends StatelessWidget {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return DSGlassPanel(
       padding: EdgeInsets.zero,
-      color: DSColors.glass,
+      color: context.ds.glass,
       child: ExpansionTile(
         maintainState: true,
         expansionAnimationStyle: reduceMotion
@@ -1387,8 +1393,8 @@ class _ResultExpansionCard extends StatelessWidget {
         childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
         shape: const Border(),
         collapsedShape: const Border(),
-        iconColor: DSColors.celadonDeep,
-        collapsedIconColor: DSColors.textMuted,
+        iconColor: context.ds.celadonDeep,
+        collapsedIconColor: context.ds.textMuted,
         title: Row(
           children: [
             Text(
@@ -1404,7 +1410,7 @@ class _ResultExpansionCard extends StatelessWidget {
                 summary,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: _mutedInk, fontSize: 11),
+                style: TextStyle(color: context.lc.inkMuted, fontSize: 11),
               ),
             ),
           ],
@@ -1430,8 +1436,8 @@ class _CastingRecordPanel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
             color: line.changing
-                ? DSColors.cinnabar.withValues(alpha: .12)
-                : _softPaper,
+                ? context.ds.cinnabar.withValues(alpha: .12)
+                : context.lc.parchment,
             borderRadius: BorderRadius.circular(13),
           ),
           child: Row(
@@ -1459,7 +1465,9 @@ class _CastingRecordPanel extends StatelessWidget {
               Text(
                 '${line.value} · ${line.traditionalName}',
                 style: TextStyle(
-                  color: line.changing ? _cinnabar : _mutedInk,
+                  color: line.changing
+                      ? context.lc.cinnabar
+                      : context.lc.inkMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1471,7 +1479,7 @@ class _CastingRecordPanel extends StatelessWidget {
       const SizedBox(height: 8),
       Text(
         '规则 ${record.methodVersion} · ${record.randomSource?.kind == 'seeded_test' ? '固定测试源' : '系统随机'}',
-        style: const TextStyle(color: _mutedInk, fontSize: 10),
+        style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
       ),
     ],
   );
@@ -1489,12 +1497,12 @@ class _ResultCoin extends StatelessWidget {
     alignment: Alignment.center,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: value == 3 ? LiuyaoColors.ink : LiuyaoColors.parchment,
+      color: value == 3 ? context.lc.ink : context.lc.parchment,
     ),
     child: Text(
       '$value',
       style: TextStyle(
-        color: value == 3 ? LiuyaoColors.paper : LiuyaoColors.ink,
+        color: value == 3 ? context.lc.paper : context.lc.ink,
         fontSize: 10,
         fontWeight: FontWeight.w600,
       ),
@@ -1517,9 +1525,9 @@ class _AnalysisEditor extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: _paper,
+      color: context.lc.paperRaised,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _rule),
+      border: Border.all(color: context.lc.inkFaint),
     ),
     child: Column(
       children: [
@@ -1538,10 +1546,10 @@ class _AnalysisEditor extends StatelessWidget {
         const Divider(),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 '每次保存都会保留上一版本',
-                style: TextStyle(color: _mutedInk, fontSize: 10),
+                style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
               ),
             ),
             FilledButton.icon(
@@ -1570,7 +1578,7 @@ class _AnalysisHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: _softPaper,
+    color: context.lc.parchment,
     borderRadius: BorderRadius.circular(12),
     clipBehavior: Clip.antiAlias,
     child: ExpansionTile(
@@ -1593,9 +1601,9 @@ class _AnalysisHistory extends StatelessWidget {
                       onPressed: () => onDelete!(item),
                       visualDensity: VisualDensity.compact,
                       iconSize: 18,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.delete_outline_rounded,
-                        color: _cinnabar,
+                        color: context.lc.cinnabar,
                       ),
                     ),
             ),
@@ -1618,19 +1626,19 @@ class _EmptyFeedback extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: _paper,
+      color: context.lc.paperRaised,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _rule),
+      border: Border.all(color: context.lc.inkFaint),
     ),
     child: Column(
       children: [
-        const Icon(Icons.timeline_rounded, color: _cinnabar, size: 30),
+        Icon(Icons.timeline_rounded, color: context.lc.cinnabar, size: 30),
         const SizedBox(height: 8),
         const Text('还没有事后反馈', style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 5),
-        const Text(
+        Text(
           '事情有进展时回来记录，用于长期复盘。',
-          style: TextStyle(color: _mutedInk, fontSize: 12),
+          style: TextStyle(color: context.lc.inkMuted, fontSize: 12),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
@@ -1655,9 +1663,9 @@ class _FeedbackCard extends StatelessWidget {
     key: Key('feedback-${item.id}'),
     padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
     decoration: BoxDecoration(
-      color: _paper,
+      color: context.lc.paperRaised,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _rule),
+      border: Border.all(color: context.lc.inkFaint),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1666,8 +1674,8 @@ class _FeedbackCard extends StatelessWidget {
           width: 8,
           height: 8,
           margin: const EdgeInsets.only(top: 6),
-          decoration: const BoxDecoration(
-            color: _cinnabar,
+          decoration: BoxDecoration(
+            color: context.lc.cinnabar,
             shape: BoxShape.circle,
           ),
         ),
@@ -1678,8 +1686,8 @@ class _FeedbackCard extends StatelessWidget {
             children: [
               Text(
                 '${_statusLabel(item.status)} · ${_date(item.occurredAt ?? item.createdAt)}',
-                style: const TextStyle(
-                  color: _cinnabar,
+                style: TextStyle(
+                  color: context.lc.cinnabar,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1824,7 +1832,7 @@ class _FeedbackEditorState extends State<_FeedbackEditor> {
         ),
         if (_error != null) ...[
           const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: _cinnabar)),
+          Text(_error!, style: TextStyle(color: context.lc.cinnabar)),
         ],
         const SizedBox(height: 14),
         FilledButton.icon(
@@ -1937,9 +1945,9 @@ class _TagsEditorState extends State<_TagsEditor> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             '为这个卦例添加或删除标签，之后可在档案列表中按标签筛选。',
-            style: TextStyle(color: _mutedInk, height: 1.4),
+            style: TextStyle(color: context.lc.inkMuted, height: 1.4),
           ),
           const SizedBox(height: 12),
           if (_tags.isNotEmpty)
@@ -1953,11 +1961,13 @@ class _TagsEditorState extends State<_TagsEditor> {
                     label: Text(tag),
                     onDeleted: () => _remove(tag),
                     deleteButtonTooltipMessage: '删除',
-                    deleteIconColor: _cinnabar,
-                    backgroundColor: LiuyaoColors.jade.withValues(alpha: .08),
-                    side: BorderSide(color: _cinnabar.withValues(alpha: .35)),
+                    deleteIconColor: context.lc.cinnabar,
+                    backgroundColor: context.lc.jade.withValues(alpha: .08),
+                    side: BorderSide(
+                      color: context.lc.cinnabar.withValues(alpha: .35),
+                    ),
                     labelStyle: TextStyle(
-                      color: LiuyaoColors.ink,
+                      color: context.lc.ink,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1965,9 +1975,9 @@ class _TagsEditorState extends State<_TagsEditor> {
               ],
             )
           else
-            const Text(
+            Text(
               '暂无标签，输入标签后点击添加。',
-              style: TextStyle(color: _mutedInk, fontSize: 12),
+              style: TextStyle(color: context.lc.inkMuted, fontSize: 12),
             ),
           const SizedBox(height: 10),
           Row(
@@ -2001,7 +2011,7 @@ class _TagsEditorState extends State<_TagsEditor> {
             const SizedBox(height: 6),
             Text(
               _error!,
-              style: const TextStyle(color: _cinnabar, fontSize: 12),
+              style: TextStyle(color: context.lc.cinnabar, fontSize: 12),
             ),
           ],
           // 快速选用：档案页「＋」新建的自定义标签与已有档案标签，
@@ -2022,8 +2032,8 @@ class _TagsEditorState extends State<_TagsEditor> {
                     key: Key('tag-suggest-$tag'),
                     label: Text(tag, style: const TextStyle(fontSize: 12)),
                     onPressed: () => _addSuggestion(tag),
-                    backgroundColor: _paper,
-                    side: const BorderSide(color: _rule),
+                    backgroundColor: context.lc.paperRaised,
+                    side: BorderSide(color: context.lc.inkFaint),
                   ),
               ],
             ),
@@ -2040,9 +2050,7 @@ class _TagsEditorState extends State<_TagsEditor> {
               FilledButton(
                 key: const Key('save-tags'),
                 onPressed: () => Navigator.pop(context, _tags),
-                style: FilledButton.styleFrom(
-                  backgroundColor: LiuyaoColors.jade,
-                ),
+                style: FilledButton.styleFrom(backgroundColor: context.lc.jade),
                 child: const Text('保存'),
               ),
             ],
