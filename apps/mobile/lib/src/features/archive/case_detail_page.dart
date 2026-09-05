@@ -531,6 +531,13 @@ class _CaseDetailPageState extends State<CaseDetailPage> {
               FadeTransition(opacity: animation, child: child),
         ),
       );
+    } on Object catch (error) {
+      // 截图/进图失败不能无声：明确告知用户并留在原界面。
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('放大视图生成失败，请稍后再试（$error）')));
+      }
     } finally {
       if (mounted) setState(() => _magnifying = false);
     }
@@ -2461,14 +2468,24 @@ class _MagnifierView extends StatefulWidget {
 class _MagnifierViewState extends State<_MagnifierView> {
   late final TransformationController _controller;
   late double _scale;
+  bool _armed = false;
 
   @override
   void initState() {
     super.initState();
     _scale = widget.initialScale;
-    _controller = TransformationController(
-      Matrix4.diagonal3Values(widget.initialScale, widget.initialScale, 1),
-    );
+    _controller = TransformationController();
+  }
+
+  /// 首帧 build 前（InteractiveViewer 尚未监听 controller）以屏幕中心
+  /// 为锚点设置初始矩阵：放大的注视点落在页面中部（卦面所在处），
+  /// 而不是默认矩阵锚定的左上角。
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_armed) return;
+    _armed = true;
+    _controller.value = _centeredMatrix(widget.initialScale);
   }
 
   @override
@@ -2478,25 +2495,70 @@ class _MagnifierViewState extends State<_MagnifierView> {
     super.dispose();
   }
 
+  /// 以 [scale] 缩放并让视口中心对准图片中心：
+  /// v = M·p，取 v_center = c、p_center = c（截图即视口本身），
+  /// 故 translation = c − scale·c。
+  Matrix4 _centeredMatrix(double scale) {
+    final center = MediaQuery.sizeOf(context).center(Offset.zero);
+    return Matrix4.identity()
+      ..setEntry(0, 0, scale)
+      ..setEntry(1, 1, scale)
+      ..setEntry(0, 3, center.dx * (1 - scale))
+      ..setEntry(1, 3, center.dy * (1 - scale));
+  }
+
+  /// 当前视口中心注视的图片点：p = (c − t) / s（矩阵无旋转剪切）。
+  Offset _gazePoint() {
+    final center = MediaQuery.sizeOf(context).center(Offset.zero);
+    final matrix = _controller.value;
+    final scale = matrix.getMaxScaleOnAxis();
+    final translation = matrix.getTranslation();
+    return Offset(
+      (center.dx - translation.x) / scale,
+      (center.dy - translation.y) / scale,
+    );
+  }
+
+  /// 切换倍数时保持注视点不动：新矩阵的视口中心仍对准原注视的
+  /// 图片点，只改变缩放（不再重置回左上角）。
   void _applyScale(double value) {
+    final center = MediaQuery.sizeOf(context).center(Offset.zero);
+    final gaze = _gazePoint();
     setState(() => _scale = value);
-    _controller.value = Matrix4.diagonal3Values(value, value, 1);
+    _controller.value = Matrix4.identity()
+      ..setEntry(0, 0, value)
+      ..setEntry(1, 1, value)
+      ..setEntry(0, 3, center.dx - value * gaze.dx)
+      ..setEntry(1, 3, center.dy - value * gaze.dy);
+  }
+
+  /// 双击复位：回到初始倍数并**重新对中**（画面拖偏/找不到内容时的
+  /// 兜底入口——不能走 [_applyScale]，那会保留当前注视点）。
+  void _resetView() {
+    setState(() => _scale = widget.initialScale);
+    _controller.value = _centeredMatrix(widget.initialScale);
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          InteractiveViewer(
-            transformationController: _controller,
-            minScale: 1.0,
-            maxScale: 4.0,
-            panEnabled: true,
-            boundaryMargin: const EdgeInsets.all(double.infinity),
-            child: SizedBox.expand(
-              child: RawImage(image: widget.image, fit: BoxFit.contain),
+          GestureDetector(
+            onDoubleTap: _resetView,
+            child: InteractiveViewer(
+              transformationController: _controller,
+              minScale: 1.0,
+              maxScale: 4.0,
+              panEnabled: true,
+              // 有限边界：允许自由拖动查看局部，但图片永远不会被
+              // 完全拖出视口（边界外最多再出一屏的 90%）。
+              boundaryMargin: EdgeInsets.all(size.shortestSide * 0.9),
+              child: SizedBox.expand(
+                child: RawImage(image: widget.image, fit: BoxFit.contain),
+              ),
             ),
           ),
           SafeArea(

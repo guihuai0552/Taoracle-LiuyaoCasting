@@ -2236,6 +2236,73 @@ void main() {
     expect(find.byKey(const Key('case-detail-scroll')), findsOneWidget);
   });
 
+  testWidgets('magnifier zooms around center and keeps gaze on scale switch', (
+    tester,
+  ) async {
+    // 用户反馈修复回归：① 初始放大以屏幕中心为锚点（旧实现锚定
+    // 左上角，2.5× 时只能看到页面顶部，卦面不可见）；② 切换倍数
+    // 保持注视点（旧实现重置平移跳回左上角）；③ 双击复位对中。
+    final archive = _FakeArchiveDataSource.withCase();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CaseDetailPage(client: archive, initialDetail: archive.detail),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('case-magnifier')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('magnifier-ratio-2.5')));
+    await tester.pumpAndSettle();
+
+    final viewerFinder = find.byType(InteractiveViewer);
+    final controller =
+        tester.widget<InteractiveViewer>(viewerFinder).transformationController!;
+    final size =
+        tester.view.physicalSize / tester.view.devicePixelRatio;
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // 视口中心当前注视的图片点（矩阵无旋转剪切：p = (c − t) / s）。
+    Offset gaze() {
+      final m = controller.value;
+      final s = m.getMaxScaleOnAxis();
+      final t = m.getTranslation();
+      return Offset((center.dx - t.x) / s, (center.dy - t.y) / s);
+    }
+
+    // ① 初始 2.5×：注视点落在图片中心（截图即视口本身）。
+    expect(controller.value.getMaxScaleOnAxis(), closeTo(2.5, 0.001));
+    expect(gaze().dx, closeTo(center.dx, 0.5));
+    expect(gaze().dy, closeTo(center.dy, 0.5));
+
+    // ② 拖动有效：平移发生变化，注视点随之移动。
+    final initialTranslationX = controller.value.getTranslation().x;
+    await tester.drag(viewerFinder, const Offset(-80, -160));
+    await tester.pumpAndSettle();
+    expect(
+      controller.value.getTranslation().x,
+      isNot(closeTo(initialTranslationX, 0.5)),
+    );
+    final gazedAfterDrag = gaze();
+    expect(gazedAfterDrag.dy, isNot(closeTo(center.dy, 0.5)));
+
+    // ③ 切换倍数到 2×：scale 更新且注视点保持不动。
+    await tester.tap(find.byKey(const Key('magnifier-chip-2.0')));
+    await tester.pumpAndSettle();
+    expect(controller.value.getMaxScaleOnAxis(), closeTo(2.0, 0.001));
+    expect(gaze().dx, closeTo(gazedAfterDrag.dx, 0.5));
+    expect(gaze().dy, closeTo(gazedAfterDrag.dy, 0.5));
+
+    // ④ 双击复位：回到初始倍数并重新对中（两击间隔须大于
+    // kDoubleTapMinTime 且小于 kDoubleTapTimeout，取 100ms）。
+    await tester.tapAt(center);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(center);
+    await tester.pumpAndSettle();
+    expect(controller.value.getMaxScaleOnAxis(), closeTo(2.5, 0.001));
+    expect(gaze().dx, closeTo(center.dx, 0.5));
+    expect(gaze().dy, closeTo(center.dy, 0.5));
+  });
+
   testWidgets('settings font choices persist and notify ui font', (
     tester,
   ) async {
