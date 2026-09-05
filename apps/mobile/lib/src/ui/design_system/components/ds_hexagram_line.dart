@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../tokens/ds_colors.dart';
 import '../tokens/ds_motion.dart';
+import '../tokens/ds_theme_extension.dart';
 
 /// 六爻爻线 · 纯展示组件。
 ///
@@ -68,15 +68,16 @@ class _DSHexagramLineState extends State<DSHexagramLine>
 
   @override
   Widget build(BuildContext context) {
+    final ds = context.ds;
     final lineColor = widget.highlight
-        ? DSColors.jade
+        ? ds.jade
         : widget.changing
-        ? DSColors.cinnabarSoft
-        : DSColors.textPrimary;
+        ? ds.cinnabarSoft
+        : ds.textPrimary;
     final glowColor = widget.changing
-        ? DSColors.glowCinnabar
+        ? ds.glowCinnabar
         : widget.highlight
-        ? DSColors.glowJade
+        ? ds.glowJade
         : Colors.transparent;
 
     final line = SizedBox(
@@ -106,8 +107,8 @@ class _DSHexagramLineState extends State<DSHexagramLine>
                 child: widget.changing
                     ? Text(
                         widget.changingValue == 9 ? 'Ｏ' : 'Χ',
-                        style: const TextStyle(
-                          color: DSColors.cinnabarSoft,
+                        style: TextStyle(
+                          color: ds.cinnabarSoft,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           height: 1,
