@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_theme_extension.dart';
 import '../../ui/liuyao_design.dart';
 import '../archive/archive_client.dart';
 import '../archive/case_detail_page.dart';
 import '../settings/app_preferences.dart';
 import 'casting_client.dart';
-
-const _ink = LiuyaoColors.ink;
-const _mutedInk = LiuyaoColors.inkMuted;
-const _cinnabar = LiuyaoColors.cinnabar;
-const _paper = LiuyaoColors.paperRaised;
-const _rule = LiuyaoColors.inkFaint;
 
 /// 时刻起卦法（时间起卦）页面。
 ///
@@ -129,7 +123,7 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: _paper,
+      backgroundColor: context.lc.paperRaised,
       builder: (context) =>
           _TimePillarConfirmation(question: question, dateTime: _dateTime),
     );
@@ -236,7 +230,7 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
               onTap: _pickDate,
             ),
           ),
-          Container(width: 1, height: 44, color: _rule),
+          Container(width: 1, height: 44, color: context.lc.inkFaint),
           Expanded(
             child: _DateTimeButton(
               key: const Key('time-pillar-time'),
@@ -260,7 +254,7 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.rule_outlined, color: _cinnabar, size: 18),
+              Icon(Icons.rule_outlined, color: context.lc.cinnabar, size: 18),
               const SizedBox(width: 8),
               const Text(
                 '取数规则',
@@ -269,7 +263,7 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
               const Spacer(),
               Text(
                 '刻干 · 刻支 · 日时干序',
-                style: TextStyle(color: _mutedInk, fontSize: 9),
+                style: TextStyle(color: context.lc.inkMuted, fontSize: 9),
               ),
             ],
           ),
@@ -278,13 +272,21 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
             '内卦 = 刻干纳甲翻卦（甲壬乾 乙癸坤 丙艮 丁兑 戊坎 己离 庚震 辛巽）\n'
             '外卦 = 刻支后天方位翻卦（子坎 丑寅艮 卯震 辰巳巽 午离 未申坤 酉兑 戌亥乾）\n'
             '动爻 =（日干序数 + 时干序数）mod 6，余 0 取上爻',
-            style: const TextStyle(color: _mutedInk, fontSize: 11, height: 1.7),
+            style: TextStyle(
+              color: context.lc.inkMuted,
+              fontSize: 11,
+              height: 1.7,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             '念头起时锁定时刻干支；一时辰 120 分钟均分 12 刻，每刻十分钟，\n'
             '时上起刻法推刻柱（时辰内 0-9 分为子刻、10-19 为丑刻，依此类推）。',
-            style: const TextStyle(color: _mutedInk, fontSize: 10, height: 1.6),
+            style: TextStyle(
+              color: context.lc.inkMuted,
+              fontSize: 10,
+              height: 1.6,
+            ),
           ),
         ],
       ),
@@ -300,8 +302,8 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
             onPressed: _submitting ? null : _resetDateTime,
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              side: const BorderSide(color: _cinnabar),
-              foregroundColor: _ink,
+              side: BorderSide(color: context.lc.cinnabar),
+              foregroundColor: context.lc.ink,
             ),
             child: const Text('重置'),
           ),
@@ -313,7 +315,7 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
             onPressed: _submitting ? null : _reviewAndSubmit,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              backgroundColor: LiuyaoColors.cinnabar,
+              backgroundColor: context.lc.cinnabar,
             ),
             child: _submitting
                 ? const SizedBox.square(
@@ -340,9 +342,9 @@ class _TimePillarCastingPageState extends State<TimePillarCastingPage> {
 
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
-      color: _paper,
+      color: context.lc.paperRaised,
       borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-      border: Border.all(color: _rule, width: .8),
+      border: Border.all(color: context.lc.inkFaint, width: .8),
     );
   }
 
@@ -376,7 +378,7 @@ class _DateTimeButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         child: Row(
           children: [
-            Icon(icon, color: _cinnabar, size: 20),
+            Icon(icon, color: context.lc.cinnabar, size: 20),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -386,15 +388,15 @@ class _DateTimeButton extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: _mutedInk, fontSize: 10),
+                    style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _ink,
+                    style: TextStyle(
+                      color: context.lc.ink,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
@@ -420,15 +422,13 @@ class _InlineError extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         // v1.0：警示卡走暗红族（glowWarning），不再借用动爻信号色。
-        color: DSColors.glowWarning,
+        color: context.ds.glowWarning,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: DSColors.signalPlum.withValues(alpha: .33),
-        ),
+        border: Border.all(color: context.ds.signalPlum.withValues(alpha: .33)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: _cinnabar, size: 18),
+          Icon(Icons.error_outline, color: context.lc.cinnabar, size: 18),
           const SizedBox(width: 8),
           Expanded(child: Text(message)),
         ],
@@ -475,10 +475,10 @@ class _TimePillarConfirmation extends StatelessWidget {
                 '${_two(dateTime.hour)}:${_two(dateTime.minute)}',
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '将按「时刻起卦法 2.0」取数成卦：念头起时锁定时刻干支，'
             '以刻干纳甲为内卦、刻支方位为外卦，日干与时干序数定动爻，并保存为档案。',
-            style: TextStyle(color: _mutedInk, fontSize: 11),
+            style: TextStyle(color: context.lc.inkMuted, fontSize: 11),
           ),
           const SizedBox(height: 18),
           Row(
@@ -488,7 +488,7 @@ class _TimePillarConfirmation extends StatelessWidget {
                   onPressed: () => Navigator.pop(context, false),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
-                    side: const BorderSide(color: _cinnabar),
+                    side: BorderSide(color: context.lc.cinnabar),
                   ),
                   child: const Text('取消'),
                 ),
@@ -499,7 +499,7 @@ class _TimePillarConfirmation extends StatelessWidget {
                   onPressed: () => Navigator.pop(context, true),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
-                    backgroundColor: LiuyaoColors.cinnabar,
+                    backgroundColor: context.lc.cinnabar,
                   ),
                   child: const Text('确认排盘'),
                 ),
@@ -523,7 +523,7 @@ class _ConfirmationRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: LiuyaoColors.parchment,
+        color: context.lc.parchment,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -531,8 +531,8 @@ class _ConfirmationRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: _mutedInk,
+            style: TextStyle(
+              color: context.lc.inkMuted,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
