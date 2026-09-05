@@ -2,22 +2,18 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-import '../tokens/ds_colors.dart';
 import '../tokens/ds_radius.dart';
 import '../tokens/ds_shadow.dart';
 import '../tokens/ds_spacing.dart';
+import '../tokens/ds_theme_extension.dart';
 
-/// 玻璃面板：半透明背景 + 细线边框 + 可选毛玻璃模糊 + 低透明度叠层。
-///
-/// 用于卦盘容器、信息浮层、解读摘要卡、弹层背景。默认关闭
-/// [enableBlur]（BackdropFilter 在列表滚动中成本较高），需要时显式开启。
 class DSGlassPanel extends StatelessWidget {
   const DSGlassPanel({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(DSSpacing.lg),
     this.radius = DSRadius.lg,
-    this.color = DSColors.glass,
+    this.color,
     this.border,
     this.shadow = DSShadow.panel,
     this.glow,
@@ -28,7 +24,7 @@ class DSGlassPanel extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double radius;
-  final Color color;
+  final Color? color;
   final BoxBorder? border;
   final List<BoxShadow> shadow;
   final BoxShadow? glow;
@@ -37,16 +33,14 @@ class DSGlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ds = context.ds;
+    final effectiveColor = color ?? ds.glass;
     final effectiveGlow = glow;
     final shadows = [?effectiveGlow, ...shadow];
     final decoration = BoxDecoration(
-      color: color,
+      color: effectiveColor,
       borderRadius: BorderRadius.circular(radius),
-      border:
-          border ??
-          const Border.fromBorderSide(
-            BorderSide(color: DSColors.hairline, width: .8),
-          ),
+      border: border ?? Border.all(color: ds.hairline, width: .8),
       boxShadow: shadows,
     );
 
