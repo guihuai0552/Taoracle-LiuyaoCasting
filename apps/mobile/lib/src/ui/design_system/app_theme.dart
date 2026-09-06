@@ -41,13 +41,14 @@ ThemeData buildOrientalInstrumentTheme() {
   // 2026-09-01 字体规范统一：全 App 以「道谕六爻」基准（sans 链）为唯一
   // 标题字体——serifFallback 在 Android 上无衬线可回退，导致双端与页面间
   // 字体漂移，故标题不再切衬线链，仅保留 w600→w700 的层级提升。
-  TextStyle heading(TextStyle? source) => (source ?? const TextStyle()).copyWith(
-    color: DSColors.textPrimary,
-    fontFamilyFallback: DSTypography.sansFallback,
-    fontWeight: (source?.fontWeight ?? FontWeight.w600) == FontWeight.w600
-        ? FontWeight.w700
-        : source?.fontWeight,
-  );
+  TextStyle heading(TextStyle? source) =>
+      (source ?? const TextStyle()).copyWith(
+        color: DSColors.textPrimary,
+        fontFamilyFallback: DSTypography.sansFallback,
+        fontWeight: (source?.fontWeight ?? FontWeight.w600) == FontWeight.w600
+            ? FontWeight.w700
+            : source?.fontWeight,
+      );
 
   return base.copyWith(
     colorScheme: colors,

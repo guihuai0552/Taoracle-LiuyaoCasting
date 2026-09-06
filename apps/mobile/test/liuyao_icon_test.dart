@@ -6,9 +6,7 @@ import 'package:liuyao_archive/src/ui/design_system/components/liuyao_icon.dart'
 void main() {
   testWidgets('每个图标类型都有可加载的 SVG 资源', (tester) async {
     for (final type in LiuyaoIconType.values) {
-      await tester.pumpWidget(
-        TestableIcon(icon: type, selected: false),
-      );
+      await tester.pumpWidget(TestableIcon(icon: type, selected: false));
       expect(tester.takeException(), isNull, reason: '${type.path} 渲染失败');
     }
   });

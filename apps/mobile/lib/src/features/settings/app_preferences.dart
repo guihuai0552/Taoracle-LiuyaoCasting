@@ -6,6 +6,29 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:liuyao_engine/liuyao_engine.dart' as engine;
 
+enum AppThemeMode {
+  auto,
+  light,
+  dark;
+
+  static const AppThemeMode defaultMode = AppThemeMode.light;
+
+  static AppThemeMode fromStorage(String? value) {
+    return switch (value) {
+      'light' => AppThemeMode.light,
+      'dark' => AppThemeMode.dark,
+      'auto' => AppThemeMode.auto,
+      _ => defaultMode,
+    };
+  }
+
+  String get storageValue => switch (this) {
+    AppThemeMode.auto => 'auto',
+    AppThemeMode.light => 'light',
+    AppThemeMode.dark => 'dark',
+  };
+}
+
 /// 应用偏好（显示与历法口径），持久化到应用私有目录 settings.json。
 ///
 /// 设计要点：
@@ -29,6 +52,7 @@ class AppPreferences {
     this.exportAnalysisHistoryDefault = true,
     this.uiFontFamily = kUiFontSystem,
     this.exportFontFamily = kExportFontDaoyu,
+    this.themeMode = AppThemeMode.defaultMode,
   });
 
   /// 首次进入六爻功能的历法口径选择是否已完成。
@@ -74,6 +98,9 @@ class AppPreferences {
   /// 导出长图字体：'daoyu'=道谕宋（现状默认），'system'=系统默认。
   final String exportFontFamily;
 
+  /// 主题模式：跟随系统 / 强制浅色 / 强制暗色。
+  final AppThemeMode themeMode;
+
   AppPreferences copyWith({
     bool? calendarPolicySetupCompleted,
     String? dayBoundaryStrategy,
@@ -89,6 +116,7 @@ class AppPreferences {
     bool? exportAnalysisHistoryDefault,
     String? uiFontFamily,
     String? exportFontFamily,
+    AppThemeMode? themeMode,
   }) => AppPreferences(
     calendarPolicySetupCompleted:
         calendarPolicySetupCompleted ?? this.calendarPolicySetupCompleted,
@@ -108,6 +136,7 @@ class AppPreferences {
         exportAnalysisHistoryDefault ?? this.exportAnalysisHistoryDefault,
     uiFontFamily: uiFontFamily ?? this.uiFontFamily,
     exportFontFamily: exportFontFamily ?? this.exportFontFamily,
+    themeMode: themeMode ?? this.themeMode,
   );
 
   Map<String, dynamic> toJson() => {
@@ -125,6 +154,7 @@ class AppPreferences {
     'exportAnalysisHistoryDefault': exportAnalysisHistoryDefault,
     'uiFontFamily': uiFontFamily,
     'exportFontFamily': exportFontFamily,
+    'themeMode': themeMode.storageValue,
   };
 
   factory AppPreferences.fromJson(Map<String, dynamic>? json) {
@@ -156,6 +186,7 @@ class AppPreferences {
           json['exportAnalysisHistoryDefault'] != false,
       uiFontFamily: _fontChoice(json['uiFontFamily'], kUiFontSystem),
       exportFontFamily: _fontChoice(json['exportFontFamily'], kExportFontDaoyu),
+      themeMode: AppThemeMode.fromStorage(json['themeMode'] as String?),
       customTags: [
         for (final value in (json['customTags'] as List<dynamic>? ?? const []))
           if (value is String && value.trim().isNotEmpty) value.trim(),
@@ -183,6 +214,11 @@ final ValueNotifier<String> uiFontFamilyNotifier = ValueNotifier<String>(
 String? _cachedPath;
 AppPreferences? _cached;
 
+/// 偏好变更通知：根组件监听以实时应用主题模式等偏好。
+final ValueNotifier<AppPreferences> preferencesNotifier = ValueNotifier(
+  const AppPreferences(),
+);
+
 /// 当前已加载的偏好；未加载时返回默认值。
 AppPreferences get currentPreferences => _cached ?? const AppPreferences();
 
@@ -204,6 +240,7 @@ Future<AppPreferences> loadPreferences() async {
     _cached = const AppPreferences();
   }
   uiFontFamilyNotifier.value = currentPreferences.uiFontFamily;
+  preferencesNotifier.value = currentPreferences;
   return currentPreferences;
 }
 
@@ -211,6 +248,7 @@ Future<AppPreferences> loadPreferences() async {
 Future<void> savePreferences(AppPreferences preferences) async {
   _cached = preferences;
   uiFontFamilyNotifier.value = preferences.uiFontFamily;
+  preferencesNotifier.value = preferences;
   try {
     final path = await _resolvePath();
     final file = File(path);
@@ -227,6 +265,7 @@ void resetPreferencesCacheForTest() {
   _cached = null;
   _cachedPath = null;
   uiFontFamilyNotifier.value = kUiFontSystem;
+  preferencesNotifier.value = const AppPreferences();
 }
 
 Future<String> _resolvePath() async {

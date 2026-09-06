@@ -29,6 +29,37 @@ void main() {
     expect(prefs.showCalculationBasis, isFalse);
   });
 
+  test('主题模式：默认浅色，三态可往返保存', () async {
+    final defaults = await loadPreferences();
+    expect(defaults.themeMode, AppThemeMode.light);
+
+    await savePreferences(defaults.copyWith(themeMode: AppThemeMode.dark));
+    resetPreferencesCacheForTest();
+    final reloaded = await loadPreferences();
+    expect(reloaded.themeMode, AppThemeMode.dark);
+
+    await savePreferences(reloaded.copyWith(themeMode: AppThemeMode.auto));
+    resetPreferencesCacheForTest();
+    final auto = await loadPreferences();
+    expect(auto.themeMode, AppThemeMode.auto);
+  });
+
+  test('主题模式：旧偏好文件（无 themeMode 字段）回退浅色默认', () async {
+    final file = File('${tempDir.path}/liuyao_settings.json');
+    await file.writeAsString('{"showNayin": true}');
+    resetPreferencesCacheForTest();
+    final legacy = await loadPreferences();
+    expect(legacy.themeMode, AppThemeMode.light);
+  });
+
+  test('主题模式：非法 themeMode 值回退浅色默认', () async {
+    final file = File('${tempDir.path}/liuyao_settings.json');
+    await file.writeAsString('{"themeMode": "neon"}');
+    resetPreferencesCacheForTest();
+    final prefs = await loadPreferences();
+    expect(prefs.themeMode, AppThemeMode.light);
+  });
+
   test('保存后重新加载可恢复全部字段', () async {
     await savePreferences(
       const AppPreferences().copyWith(

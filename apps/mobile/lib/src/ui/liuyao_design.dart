@@ -3,37 +3,18 @@ import 'package:flutter/material.dart';
 import 'design_system/app_theme_v1.dart';
 import 'design_system/tokens/ds_colors.dart';
 import 'design_system/tokens/ds_colors_v1.dart';
+import 'design_system/tokens/ds_theme_extension.dart';
 
-/// 语义别名层：历史令牌映射到「道谕六爻」浅色朱红体系。
-///
-/// 迁移策略：不改既有 `LiuyaoColors.xxx` 引用，只在此处换语义值，
-/// 全部页面一次性切换。命名保持旧称以避免大面积机械改动。
-/// 当前取值经 [DSColors] 门面指向浅色朱红 token
-/// （暖白底 × 纯白卡片 × 朱红主强调 × 棕金辅助），与生产主题一致。
 abstract final class LiuyaoColors {
-  /// 页面背景 → 宣纸米白。
   static const paper = DSColors.background;
-
-  /// 抬升表面（卡片底）。
   static const paperRaised = DSColors.surfaceRaised;
-
-  /// 次级表面（图标底、分组底）。
   static const parchment = DSColors.surface;
-
-  /// 主文本 / 主色 → 浓墨。
   static const ink = DSColors.textPrimary;
   static const inkMedium = DSColors.textSecondary;
   static const inkMuted = DSColors.textMuted;
-
-  /// 弱化线 → 发丝线。
   static const inkFaint = DSColors.hairlineStrong;
-
-  /// 朱砂（克制使用）。
   static const cinnabar = DSColors.cinnabar;
-
-  /// 玉青。
   static const jade = DSColors.jade;
-
   static const wood = DSColors.wood;
   static const fire = DSColors.fire;
   static const earth = DSColors.earth;
@@ -41,37 +22,16 @@ abstract final class LiuyaoColors {
   static const water = DSColors.water;
 }
 
-/// 语义别名层（v1.0）：Quiet Intelligence 色板的旧称映射。
-///
-/// 供迁移期使用——旧 `LiuyaoColors.xxx` 引用可逐处切换到本层，
-/// 字段与 [LiuyaoColors] 一一对应，避免大面积机械改动。
-/// 注意：本层服务于**浅色模式**（米白底 × 深字），暗色场景请直接用
-/// [DSColorsV1] 的 night 系令牌。
 abstract final class LiuyaoColorsV1 {
-  /// 页面背景 → 米白。
   static const paper = DSColorsV1.background;
-
-  /// 抬升表面（卡片底）→ 米白微亮层。
   static const paperRaised = DSColorsV1.surfaceLight;
-
-  /// 次级表面（图标底、分组底、输入框底）→ 米白微暗层。
   static const parchment = DSColorsV1.surfaceLightSunken;
-
-  /// 主文本 → 玄武岩黑。
   static const ink = DSColorsV1.textPrimary;
   static const inkMedium = DSColorsV1.textSecondary;
   static const inkMuted = DSColorsV1.textMuted;
-
-  /// 弱化线 → 强发丝线。
   static const inkFaint = DSColorsV1.hairlineStrong;
-
-  /// 警示（克制使用）→ 暗红。
   static const cinnabar = DSColorsV1.warning;
-
-  /// 强调（仅关键信息）→ 蓝灰。
   static const jade = DSColorsV1.accent;
-
-  // 五行（保留，不动）。
   static const wood = DSColorsV1.wood;
   static const fire = DSColorsV1.fire;
   static const earth = DSColorsV1.earth;
@@ -95,12 +55,34 @@ abstract final class LiuyaoRadii {
   static const phone = 24.0;
 }
 
-ThemeData buildLiuyaoTheme() {
-  // 全局切换为「道谕六爻」浅色朱红主题（依照线框图 wireframe-preview-approved.html 还原）。
-  // 暖白 #F3F2EF 底 × 纯白卡片 × 朱红 #A9282D 主强调 × 棕金 #AE8648 辅助。
-  // DSColors 门面已同步指向浅色朱红 token。
-  return buildDaoyuTheme();
+class LiuyaoColorsContext {
+  const LiuyaoColorsContext(this.ds);
+
+  final DSColorsScheme ds;
+
+  Color get paper => ds.background;
+  Color get paperRaised => ds.surfaceRaised;
+  Color get parchment => ds.surface;
+  Color get ink => ds.textPrimary;
+  Color get inkMedium => ds.textSecondary;
+  Color get inkMuted => ds.textMuted;
+  Color get inkFaint => ds.hairlineStrong;
+  Color get cinnabar => ds.cinnabar;
+  Color get jade => ds.jade;
+  Color get wood => ds.wood;
+  Color get fire => ds.fire;
+  Color get earth => ds.earth;
+  Color get metal => ds.metal;
+  Color get water => ds.water;
 }
+
+extension LiuyaoColorsContextExt on BuildContext {
+  LiuyaoColorsContext get lc => LiuyaoColorsContext(ds);
+}
+
+ThemeData buildLiuyaoTheme() => buildDaoyuTheme();
+
+ThemeData buildLiuyaoDarkTheme() => buildDaoyuDarkTheme();
 
 class LiuyaoPaperBackground extends StatelessWidget {
   const LiuyaoPaperBackground({super.key, required this.child});
@@ -112,14 +94,15 @@ class LiuyaoPaperBackground extends StatelessWidget {
 }
 
 class ChineseLatticePainter extends CustomPainter {
-  const ChineseLatticePainter({this.opacity = .09});
+  const ChineseLatticePainter({this.opacity = .09, this.lineColor});
 
   final double opacity;
+  final Color? lineColor;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = LiuyaoColors.inkMedium.withValues(alpha: opacity)
+      ..color = (lineColor ?? LiuyaoColors.inkMedium).withValues(alpha: opacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = .75;
     const unit = 24.0;
@@ -151,7 +134,9 @@ class ChineseLatticePainter extends CustomPainter {
     corner(Offset(0, size.height), 1, -1);
 
     final grain = Paint()
-      ..color = LiuyaoColors.inkMedium.withValues(alpha: opacity * .32)
+      ..color = (lineColor ?? LiuyaoColors.inkMedium).withValues(
+        alpha: opacity * .32,
+      )
       ..strokeWidth = .7;
     for (var y = 18.0; y < size.height; y += 47) {
       final x = (y * 1.73) % size.width;
@@ -161,7 +146,7 @@ class ChineseLatticePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ChineseLatticePainter oldDelegate) =>
-      oldDelegate.opacity != opacity;
+      oldDelegate.opacity != opacity || oldDelegate.lineColor != lineColor;
 }
 
 class LiuyaoPaperCard extends StatelessWidget {
@@ -169,29 +154,30 @@ class LiuyaoPaperCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.color = LiuyaoColors.paperRaised,
+    this.color,
     this.radius = LiuyaoRadii.card,
     this.border = true,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final Color color;
+  final Color? color;
   final double radius;
   final bool border;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: padding,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(radius),
-      border: border
-          ? Border.all(color: LiuyaoColors.inkFaint, width: .8)
-          : null,
-    ),
-    child: child,
-  );
+  Widget build(BuildContext context) {
+    final ds = context.ds;
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: color ?? ds.surfaceRaised,
+        borderRadius: BorderRadius.circular(radius),
+        border: border ? Border.all(color: ds.hairlineStrong, width: .8) : null,
+      ),
+      child: child,
+    );
+  }
 }
 
 class LiuyaoSealMark extends StatelessWidget {
@@ -205,48 +191,52 @@ class LiuyaoSealMark extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    painter: const _SealLatticePainter(),
-    child: SizedBox(
-      width: 64,
-      height: 72,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            character,
-            // 印章字：道谕宋为随包字体，iOS / Android 渲染一致。
-            style: const TextStyle(
-              color: LiuyaoColors.cinnabar,
-              fontFamily: 'DaoyuSong',
-              fontFamilyFallback: ['Songti SC', 'Noto Serif CJK SC'],
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              height: 1,
+  Widget build(BuildContext context) {
+    final ds = context.ds;
+    return CustomPaint(
+      painter: _SealLatticePainter(cinnabar: ds.cinnabar),
+      child: SizedBox(
+        width: 64,
+        height: 72,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              character,
+              style: TextStyle(
+                color: ds.cinnabar,
+                fontFamily: 'DaoyuSong',
+                fontFamilyFallback: const ['Songti SC', 'Noto Serif CJK SC'],
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                height: 1,
+              ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: LiuyaoColors.inkMuted,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: ds.textMuted,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _SealLatticePainter extends CustomPainter {
-  const _SealLatticePainter();
+  const _SealLatticePainter({required this.cinnabar});
+
+  final Color cinnabar;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = LiuyaoColors.cinnabar
+      ..color = cinnabar
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
     final outer = RRect.fromRectAndRadius(
@@ -256,7 +246,7 @@ class _SealLatticePainter extends CustomPainter {
     canvas.drawRRect(outer, paint);
     canvas.drawRect(
       Rect.fromLTWH(7, 7, size.width - 14, size.height - 14),
-      paint..color = LiuyaoColors.cinnabar.withValues(alpha: .66),
+      paint..color = cinnabar.withValues(alpha: .66),
     );
     final lattice = Path()
       ..moveTo(7, size.height / 2)
@@ -271,5 +261,6 @@ class _SealLatticePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SealLatticePainter oldDelegate) =>
+      oldDelegate.cinnabar != cinnabar;
 }

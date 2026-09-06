@@ -82,7 +82,7 @@ class _CalendarPolicyDialogState extends State<_CalendarPolicyDialog> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
             child: DSGlassPanel(
-              color: DSColors.glassStrong,
+              color: context.ds.glassStrong,
               enableBlur: true,
               blurSigma: 18,
               child: SingleChildScrollView(
@@ -92,10 +92,10 @@ class _CalendarPolicyDialogState extends State<_CalendarPolicyDialog> {
                   children: [
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.explore_outlined,
                           size: 20,
-                          color: DSColors.celadonDeep,
+                          color: context.ds.celadonDeep,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -111,19 +111,19 @@ class _CalendarPolicyDialogState extends State<_CalendarPolicyDialog> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       '交日、交月口径决定四柱计算边界，随每次起卦存档；历史档案不受影响。',
                       style: TextStyle(
-                        color: DSColors.textSecondary,
+                        color: context.ds.textSecondary,
                         fontSize: 11,
                         height: 1.5,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       '交日',
                       style: TextStyle(
-                        color: DSColors.textSecondary,
+                        color: context.ds.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 2,
@@ -156,10 +156,10 @@ class _CalendarPolicyDialogState extends State<_CalendarPolicyDialog> {
                       }),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       '交月',
                       style: TextStyle(
-                        color: DSColors.textSecondary,
+                        color: context.ds.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 2,
@@ -201,18 +201,18 @@ class _CalendarPolicyDialogState extends State<_CalendarPolicyDialog> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: DSColors.glassWeak,
+                        color: context.ds.glassWeak,
                         borderRadius: BorderRadius.circular(DSRadius.sm),
                         border: Border.all(
-                          color: DSColors.metalLine,
+                          color: context.ds.metalLine,
                           width: .8,
                         ),
                       ),
                       child: Text(
                         '当前口径：交日 $_dayLabel · 交月 $_monthLabel',
                         key: const Key('calendar-policy-current'),
-                        style: const TextStyle(
-                          color: DSColors.celadonDeep,
+                        style: TextStyle(
+                          color: context.ds.celadonDeep,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           height: 1.5,
@@ -300,11 +300,11 @@ class _RuleChoiceCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
           decoration: BoxDecoration(
             color: selected
-                ? DSColors.celadon.withValues(alpha: .12)
-                : DSColors.glassWeak,
+                ? context.ds.celadon.withValues(alpha: .12)
+                : context.ds.glassWeak,
             borderRadius: BorderRadius.circular(DSRadius.md),
             border: Border.all(
-              color: selected ? DSColors.celadon : DSColors.hairlineStrong,
+              color: selected ? context.ds.celadon : context.ds.hairlineStrong,
               width: selected ? 1.2 : .8,
             ),
           ),
@@ -315,7 +315,7 @@ class _RuleChoiceCard extends StatelessWidget {
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
                 size: 17,
-                color: selected ? DSColors.celadonDeep : DSColors.textMuted,
+                color: selected ? context.ds.celadonDeep : context.ds.textMuted,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -328,8 +328,8 @@ class _RuleChoiceCard extends StatelessWidget {
                           title,
                           style: TextStyle(
                             color: selected
-                                ? DSColors.textPrimary
-                                : DSColors.textSecondary,
+                                ? context.ds.textPrimary
+                                : context.ds.textSecondary,
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,
                           ),
@@ -342,17 +342,17 @@ class _RuleChoiceCard extends StatelessWidget {
                               vertical: 1.5,
                             ),
                             decoration: BoxDecoration(
-                              color: DSColors.jade.withValues(alpha: .16),
+                              color: context.ds.jade.withValues(alpha: .16),
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
-                                color: DSColors.jade.withValues(alpha: .4),
+                                color: context.ds.jade.withValues(alpha: .4),
                                 width: .6,
                               ),
                             ),
-                            child: const Text(
+                            child: Text(
                               '推荐',
                               style: TextStyle(
-                                color: DSColors.jade,
+                                color: context.ds.jade,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -364,8 +364,8 @@ class _RuleChoiceCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       hint,
-                      style: const TextStyle(
-                        color: DSColors.textMuted,
+                      style: TextStyle(
+                        color: context.ds.textMuted,
                         fontSize: 10,
                         height: 1.45,
                       ),

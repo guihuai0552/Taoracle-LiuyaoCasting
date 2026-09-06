@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../ui/design_system/tokens/ds_colors.dart';
+import '../../ui/design_system/tokens/ds_theme_extension.dart';
 import '../../ui/liuyao_design.dart';
 import 'almanac_client.dart';
 import 'almanac_models.dart';
-
-const _ink = LiuyaoColors.ink;
-const _mutedInk = LiuyaoColors.inkMuted;
-const _cinnabar = LiuyaoColors.cinnabar;
-const _paper = LiuyaoColors.paperRaised;
-const _rule = LiuyaoColors.inkFaint;
 
 class AlmanacPage extends StatefulWidget {
   const AlmanacPage({
@@ -195,9 +189,9 @@ class _AlmanacPageState extends State<AlmanacPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   '跳转后农历、干支与节气随所选年月刷新。',
-                  style: TextStyle(color: _mutedInk, fontSize: 10),
+                  style: TextStyle(color: context.lc.inkMuted, fontSize: 10),
                 ),
               ],
             ),
@@ -279,7 +273,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
       child: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadMonth,
-          color: _cinnabar,
+          color: context.lc.cinnabar,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
@@ -313,7 +307,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
                 Text(
                   '万年历',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: _mutedInk,
+                    color: context.lc.inkMuted,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 2,
                   ),
@@ -334,15 +328,15 @@ class _AlmanacPageState extends State<AlmanacPage> {
                           key: const Key('almanac-month-title'),
                           style: Theme.of(context).textTheme.headlineLarge
                               ?.copyWith(
-                                color: _ink,
+                                color: context.lc.ink,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: -1,
                               ),
                         ),
                         const SizedBox(width: 4),
-                        const Icon(
+                        Icon(
                           Icons.arrow_drop_down_rounded,
-                          color: _cinnabar,
+                          color: context.lc.cinnabar,
                           size: 26,
                         ),
                       ],
@@ -377,9 +371,9 @@ class _AlmanacPageState extends State<AlmanacPage> {
   Widget _buildCalendar() {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: _paper,
+        color: context.lc.paperRaised,
         borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        border: Border.all(color: _rule, width: .8),
+        border: Border.all(color: context.lc.inkFaint, width: .8),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 16, 10, 12),
@@ -440,9 +434,9 @@ class _AlmanacPageState extends State<AlmanacPage> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: _paper,
+        color: context.lc.paperRaised,
         borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        border: Border.all(color: _rule, width: .8),
+        border: Border.all(color: context.lc.inkFaint, width: .8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,7 +450,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
                   width: 4,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: _cinnabar,
+                    color: context.lc.cinnabar,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -475,7 +469,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
                       Text(
                         '${_solarDate(snapshot.solarDate)} · ${snapshot.weekday}'
                         '${snapshot.solarTerm == null ? '' : ' · ${snapshot.solarTerm}'}',
-                        style: const TextStyle(color: _mutedInk),
+                        style: TextStyle(color: context.lc.inkMuted),
                       ),
                     ],
                   ),
@@ -488,7 +482,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
               ],
             ),
           ),
-          const Divider(height: 1, color: _rule),
+          Divider(height: 1, color: context.lc.inkFaint),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 18, 14, 20),
             child: Column(
@@ -505,9 +499,9 @@ class _AlmanacPageState extends State<AlmanacPage> {
                     ),
                     Text(
                       '北京时间',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelMedium?.copyWith(color: _mutedInk),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: context.lc.inkMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -526,7 +520,7 @@ class _AlmanacPageState extends State<AlmanacPage> {
                   const SizedBox(height: 14),
                   Text(
                     '更新失败：$_dayError',
-                    style: const TextStyle(color: _cinnabar, fontSize: 12),
+                    style: TextStyle(color: context.lc.cinnabar, fontSize: 12),
                   ),
                 ],
               ],
@@ -569,9 +563,9 @@ class _MonthArrow extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        backgroundColor: _cinnabar,
+        backgroundColor: context.lc.cinnabar,
         foregroundColor: Colors.white,
-        disabledBackgroundColor: DSColors.celadonDim.withValues(alpha: .4),
+        disabledBackgroundColor: context.ds.celadonDim.withValues(alpha: .4),
       ),
       icon: Icon(icon, size: 18),
     );
@@ -591,7 +585,7 @@ class _WeekHeader extends StatelessWidget {
                 label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: _mutedInk,
+                  color: context.lc.inkMuted,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -619,15 +613,15 @@ class _CalendarDay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = selected
-        ? DSColors.moonWhite
+        ? context.ds.moonWhite
         : !cell.available || !cell.inCurrentMonth
-        ? DSColors.textFaint
-        : _ink;
+        ? context.ds.textFaint
+        : context.lc.ink;
     final secondary = selected
-        ? DSColors.moonWhite
+        ? context.ds.moonWhite
         : cell.solarTerm != null
-        ? _cinnabar
-        : _mutedInk;
+        ? context.lc.cinnabar
+        : context.lc.inkMuted;
 
     return Semantics(
       button: cell.available,
@@ -644,13 +638,13 @@ class _CalendarDay extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 1),
           decoration: BoxDecoration(
-            color: selected ? _cinnabar : Colors.transparent,
+            color: selected ? context.lc.cinnabar : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: today
                   ? selected
                         ? Colors.white
-                        : _cinnabar
+                        : context.lc.cinnabar
                   : Colors.transparent,
               width: today ? 1.5 : 0,
             ),
@@ -709,8 +703,8 @@ class _SectionLabel extends StatelessWidget {
       children: [
         Text(
           number,
-          style: const TextStyle(
-            color: _cinnabar,
+          style: TextStyle(
+            color: context.lc.cinnabar,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -743,20 +737,23 @@ class _PillarGrid extends StatelessWidget {
                   border: Border(
                     right: isLast
                         ? BorderSide.none
-                        : const BorderSide(color: _rule),
+                        : BorderSide(color: context.lc.inkFaint),
                   ),
                 ),
                 child: Column(
                   children: [
                     Text(
                       labels[pillar.position] ?? pillar.position,
-                      style: const TextStyle(color: _mutedInk, fontSize: 11),
+                      style: TextStyle(
+                        color: context.lc.inkMuted,
+                        fontSize: 11,
+                      ),
                     ),
                     const SizedBox(height: 7),
                     Text(
                       pillar.ganzhi,
-                      style: const TextStyle(
-                        color: _ink,
+                      style: TextStyle(
+                        color: context.lc.ink,
                         fontSize: 22,
                         fontWeight: FontWeight.w600,
                       ),
@@ -765,7 +762,10 @@ class _PillarGrid extends StatelessWidget {
                     Text(
                       pillar.nayin,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: _cinnabar, fontSize: 11),
+                      style: TextStyle(
+                        color: context.lc.cinnabar,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -816,11 +816,11 @@ class _TwoHourStrip extends StatelessWidget {
               decoration: BoxDecoration(
                 // 线框图：选中时辰为「红框圈出」——淡朱红底 + 1.2px 红描边 + 红字。
                 color: selected
-                    ? DSColors.glowCinnabar
-                    : DSColors.surfaceLightSunken,
+                    ? context.ds.glowCinnabar
+                    : context.ds.surfaceLightSunken,
                 borderRadius: BorderRadius.circular(10),
                 border: selected
-                    ? Border.all(color: _cinnabar, width: 1.2)
+                    ? Border.all(color: context.lc.cinnabar, width: 1.2)
                     : Border.all(color: Colors.transparent),
               ),
               child: Column(
@@ -829,21 +829,19 @@ class _TwoHourStrip extends StatelessWidget {
                   Text(
                     branch,
                     style: TextStyle(
-                      color: selected ? _cinnabar : _mutedInk,
+                      color: selected
+                          ? context.lc.cinnabar
+                          : context.lc.inkMuted,
                       fontSize: 11,
-                      fontWeight: selected
-                          ? FontWeight.w700
-                          : FontWeight.w400,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                     ),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     pillar.ganzhi,
                     style: TextStyle(
-                      color: selected ? _cinnabar : _ink,
-                      fontWeight: selected
-                          ? FontWeight.w700
-                          : FontWeight.w600,
+                      color: selected ? context.lc.cinnabar : context.lc.ink,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     ),
                   ),
                 ],
@@ -870,31 +868,34 @@ class _WealthGod extends StatelessWidget {
       key: const Key('wealth-god-card'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: DSColors.glassWeak,
+        color: context.ds.glassWeak,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: DSColors.hairline, width: 1),
+        border: Border.all(color: context.ds.hairline, width: 1),
       ),
       child: Row(
         children: [
-          const Icon(Icons.explore_outlined, color: _cinnabar),
+          Icon(Icons.explore_outlined, color: context.lc.cinnabar),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('财神方位', style: TextStyle(color: _cinnabar, fontSize: 12)),
+                Text(
+                  '财神方位',
+                  style: TextStyle(color: context.lc.cinnabar, fontSize: 12),
+                ),
                 SizedBox(height: 2),
                 Text(
                   '依据所选日期与时辰计算',
-                  style: TextStyle(color: _mutedInk, fontSize: 11),
+                  style: TextStyle(color: context.lc.inkMuted, fontSize: 11),
                 ),
               ],
             ),
           ),
           Text(
             direction,
-            style: const TextStyle(
-              color: _ink,
+            style: TextStyle(
+              color: context.lc.ink,
               fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
@@ -904,21 +905,21 @@ class _WealthGod extends StatelessWidget {
               width: 1,
               height: 34,
               margin: const EdgeInsets.symmetric(horizontal: 16),
-              color: DSColors.hairline,
+              color: context.ds.hairline,
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   '当值星宿',
-                  style: TextStyle(color: _cinnabar, fontSize: 12),
+                  style: TextStyle(color: context.lc.cinnabar, fontSize: 12),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   mansion!,
-                  style: const TextStyle(
-                    color: _ink,
+                  style: TextStyle(
+                    color: context.lc.ink,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -940,9 +941,9 @@ class _DetailSkeleton extends StatelessWidget {
     return Container(
       height: 260,
       decoration: BoxDecoration(
-        color: _paper,
+        color: context.lc.paperRaised,
         borderRadius: BorderRadius.circular(LiuyaoRadii.card),
-        border: Border.all(color: _rule, width: .8),
+        border: Border.all(color: context.lc.inkFaint, width: .8),
       ),
       child: const Center(child: CircularProgressIndicator()),
     );
@@ -970,7 +971,11 @@ class _ErrorPanel extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_outlined, color: _cinnabar, size: 34),
+              Icon(
+                Icons.cloud_off_outlined,
+                color: context.lc.cinnabar,
+                size: 34,
+              ),
               const SizedBox(height: 12),
               Text(message, textAlign: TextAlign.center),
               const SizedBox(height: 14),

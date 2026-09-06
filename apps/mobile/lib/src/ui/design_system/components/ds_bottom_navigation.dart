@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../tokens/ds_colors.dart';
 import '../tokens/ds_radius.dart';
 import '../tokens/ds_spacing.dart';
+import '../tokens/ds_theme_extension.dart';
 import '../tokens/ds_typography.dart';
 import 'liuyao_icon.dart';
 
-/// v1.0 Quiet Intelligence · 底部导航（自绘，替代 Material NavigationBar）。
-///
-/// 纯白玻璃浮起 + 发丝分隔线，选中项为朱红短横线 + 浓墨字，
-/// 未选中为弱文本；图标优先使用 v1.0 SVG 细线图标集（[LiuyaoIcon]），
-/// 未提供 svgIcon 时回退 Material 线性图标。
-/// 结构：高度 64 + 顶部 1px 发丝线；选中指示为 20px 短横线（朱红），
-/// 不用 Material 的胶囊指示器。
 class DSBottomNavigation extends StatelessWidget {
   const DSBottomNavigation({
     super.key,
@@ -27,12 +20,11 @@ class DSBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ds = context.ds;
     return Container(
-      decoration: const BoxDecoration(
-        color: DSColors.glassStrong,
-        border: Border(
-          top: BorderSide(color: DSColors.hairlineStrong, width: 1),
-        ),
+      decoration: BoxDecoration(
+        color: ds.glassStrong,
+        border: Border(top: BorderSide(color: ds.hairlineStrong, width: 1)),
       ),
       child: SafeArea(
         top: false,
@@ -69,8 +61,6 @@ class DSDestinationItem {
   final IconData icon;
   final IconData selectedIcon;
   final Key? itemKey;
-
-  /// v1.0 SVG 细线图标；提供时优先于 [icon] / [selectedIcon] 渲染。
   final LiuyaoIconType? svgIcon;
 }
 
@@ -87,6 +77,7 @@ class _DestinationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ds = context.ds;
     return InkWell(
       key: item.itemKey,
       onTap: onTap,
@@ -94,14 +85,13 @@ class _DestinationButton extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 选中指示：青瓷短横线。
           AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
             width: selected ? 20 : 0,
             height: 2,
             decoration: BoxDecoration(
-              color: DSColors.celadon,
+              color: ds.celadon,
               borderRadius: BorderRadius.circular(1),
             ),
           ),
@@ -111,14 +101,14 @@ class _DestinationButton extends StatelessWidget {
               svg,
               size: 22,
               selected: selected,
-              color: DSColors.textMuted,
-              selectedColor: DSColors.celadonDeep,
+              color: ds.textMuted,
+              selectedColor: ds.celadonDeep,
             )
           else
             Icon(
               selected ? item.selectedIcon : item.icon,
               size: 22,
-              color: selected ? DSColors.celadonDeep : DSColors.textMuted,
+              color: selected ? ds.celadonDeep : ds.textMuted,
             ),
           const SizedBox(height: 2),
           Text(
@@ -127,7 +117,7 @@ class _DestinationButton extends StatelessWidget {
               fontFamilyFallback: DSTypography.sansFallback,
               fontSize: 11,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              color: selected ? DSColors.textPrimary : DSColors.textMuted,
+              color: selected ? ds.textPrimary : ds.textMuted,
               height: 1.2,
             ),
           ),

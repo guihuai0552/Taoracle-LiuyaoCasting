@@ -56,7 +56,10 @@ void main() {
 
   test('删除档案后立即落盘且重启后不复活', () async {
     final client = ArchiveClient();
-    final keep = await client.saveCast(question: '保留案例', preview: makePreview());
+    final keep = await client.saveCast(
+      question: '保留案例',
+      preview: makePreview(),
+    );
     final doomed = await client.saveCast(
       question: '待删除案例',
       preview: makePreview(),
@@ -77,10 +80,7 @@ void main() {
     expect(remaining.map((item) => item.id), isNot(contains(doomed.id)));
 
     // 删除不存在的案例应显式报错而非静默成功。
-    expect(
-      () => client.deleteCase(doomed.id),
-      throwsException,
-    );
+    expect(() => client.deleteCase(doomed.id), throwsException);
   });
 
   test('退出重开后数据保留（模拟重启）', () async {
